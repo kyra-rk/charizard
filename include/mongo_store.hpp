@@ -22,14 +22,23 @@ class MongoStore : public IStore
     {
     }
 
-    void set_api_key(const std::string& user, const std::string& key) override
+    void set_api_key(const std::string& user, const std::string& key,
+                     const std::string& app_name = "") override
     {
         using bsoncxx::builder::basic::kvp;
         using bsoncxx::builder::basic::make_document;
+        // Store a hashed API key.
+        std::hash<std::string> hsh;
+        auto                    h = [&hsh](const std::string& k) {
+            std::ostringstream oss;
+            oss << std::hex << hsh(k);
+            return oss.str();
+        }(key);
 
         auto coll = db_["api_keys"];
+        // Persist the hash and optional app_name metadata.
         coll.update_one(make_document(kvp("_id", user)),
-                        make_document(kvp("$set", make_document(kvp("api_key", key)))),
+                        make_document(kvp("$set", make_document(kvp("api_key_hash", h), kvp("app_name", app_name)))),
                         mongocxx::options::update{}.upsert(true));
     }
 
@@ -44,10 +53,14 @@ class MongoStore : public IStore
             return false;
 
         auto view = doc->view();
-        auto it   = view.find("api_key");
-        if (it == view.end())
+        auto it_hash = view.find("api_key_hash");
+        if (it_hash == view.end())
             return false;
-        return std::string{ it->get_string().value } == key;
+        const auto stored_hash = std::string{ it_hash->get_string().value };
+        std::hash<std::string> h;
+        std::ostringstream      oss;
+        oss << std::hex << h(key);
+        return oss.str() == stored_hash;
     }
 
     void add_event(const TransitEvent& ev) override
