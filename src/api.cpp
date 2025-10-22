@@ -27,9 +27,11 @@ static bool check_auth(IStore& store, const httplib::Request& req, const std::st
 
 void configure_routes(httplib::Server& svr, IStore& store)
 {
+    // Health check endpoint: ensures service is running.
     svr.Get("/health", [](const httplib::Request&, httplib::Response& res)
             { json_response(res, { { "ok", true }, { "service", "charizard" }, { "time", now_epoch() } }); });
 
+    // Transit event ingestion endpoint: accepts transit events for a user.
     svr.Post(R"(/users/([A-Za-z0-9_\-]+)/transit)",
              [&store](const httplib::Request& req, httplib::Response& res)
              {
@@ -65,6 +67,7 @@ void configure_routes(httplib::Server& svr, IStore& store)
                  return json_response(res, { { "status", "ok" } }, 201);
              });
 
+    // Lifetime footprint endpoint: returns total CO2 footprint for the caller.
     svr.Get(R"(/users/([A-Za-z0-9_\-]+)/lifetime-footprint)",
             [&store](const httplib::Request& req, httplib::Response& res)
             {
@@ -85,6 +88,48 @@ void configure_routes(httplib::Server& svr, IStore& store)
                 return json_response(res, out);
             });
 
+    // Registration endpoint: creates a user_id and api_key for the caller.
+    svr.Post("/users/register",
+             [&store](const httplib::Request& req, httplib::Response& res)
+             {
+                 nlohmann::json body;
+                 try
+                 {
+                     body = nlohmann::json::parse(req.body);
+                 }
+                 catch (...)
+                 {
+                     return json_response(res, { { "error", "invalid_json" } }, 400);
+                 }
+
+                 if (!body.contains("app_name") || !body["app_name"].is_string())
+                     return json_response(res, { { "error", "missing_app_name" } }, 400);
+
+                 const std::string app_name = body["app_name"].get<std::string>();
+
+                 // generate simple id and key (demo): use random hex strings
+                 auto rnd_hex = [] (size_t len) {
+                     std::random_device rd;
+                     std::uniform_int_distribution<unsigned long long> dist(0, ULLONG_MAX);
+                     std::ostringstream oss;
+                     while (oss.str().size() < len) {
+                         oss << std::hex << dist(rd);
+                     }
+                     auto s = oss.str();
+                     return s.substr(0, len);
+                 };
+
+                 const std::string user_id = std::string("u_") + rnd_hex(8);
+                 const std::string api_key = rnd_hex(32);
+
+                 // store the key (store will hash it)
+                 store.set_api_key(user_id, api_key, app_name);
+
+                 json out = { { "user_id", user_id }, { "api_key", api_key }, { "app_name", app_name } };
+                 return json_response(res, out, 201);
+             });
+
+    // Suggestions endpoint: returns personalized suggestions to reduce footprint.
     svr.Get(R"(/users/([A-Za-z0-9_\-]+)/suggestions)",
             [&store](const httplib::Request& req, httplib::Response& res)
             {
@@ -110,6 +155,7 @@ void configure_routes(httplib::Server& svr, IStore& store)
                 return json_response(res, { { "user_id", user_id }, { "suggestions", suggestions } });
             });
 
+    // Analytics endpoint: compares user's weekly footprint to peer average.
     svr.Get(R"(/users/([A-Za-z0-9_\-]+)/analytics)",
             [&store](const httplib::Request& req, httplib::Response& res)
             {
@@ -130,6 +176,7 @@ void configure_routes(httplib::Server& svr, IStore& store)
                 return json_response(res, out);
             });
 
+    // Root endpoint: provides basic service info.
     svr.Get("/",
             [](const httplib::Request&, httplib::Response& res)
             {

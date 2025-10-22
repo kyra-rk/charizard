@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <sstream>
+#include <functional>
 
 struct TransitEvent
 {
@@ -38,7 +40,10 @@ inline double emission_factor_for(const std::string& mode)
 struct IStore
 {
     virtual ~IStore()                                                                 = default;
-    virtual void set_api_key(const std::string& user, const std::string& key)         = 0;
+    // Accepts an optional app_name metadata field. The underlying db should store a
+    // hashed version of the key rather than the plaintext key for security purposes.
+    virtual void set_api_key(const std::string& user, const std::string& key,
+                             const std::string& app_name = "")                       = 0;
     virtual bool check_api_key(const std::string& user, const std::string& key) const = 0;
     virtual void add_event(const TransitEvent& ev)                                    = 0;
     virtual std::vector<TransitEvent> get_events(const std::string& user) const       = 0;
@@ -49,18 +54,25 @@ struct IStore
 class InMemoryStore : public IStore
 {
   public:
-    // Upsert API key for a user (for demo)
-    void set_api_key(const std::string& user, const std::string& key)
+    // Upsert API key for a user (stores a hash of the key, not plaintext)
+    void set_api_key(const std::string& user, const std::string& key,
+                     const std::string& app_name = "")
     {
         std::scoped_lock lk(mu_);
-        api_keys_[user] = key;
+        const auto       h = hash_plain(key);
+        api_keys_[user]   = h;
+        if (!app_name.empty())
+            app_names_[user] = app_name;
     }
 
     bool check_api_key(const std::string& user, const std::string& key) const
     {
         std::scoped_lock lk(mu_);
         auto             it = api_keys_.find(user);
-        return (it != api_keys_.end() && it->second == key);
+        if (it == api_keys_.end())
+            return false;
+        const auto& h = it->second;
+        return hash_plain(key) == h;
     }
 
     void add_event(const TransitEvent& ev)
@@ -151,6 +163,17 @@ class InMemoryStore : public IStore
   private:
     mutable std::mutex                                         mu_;
     std::unordered_map<std::string, std::string>               api_keys_;
+    std::unordered_map<std::string, std::string>               app_names_;
     std::unordered_map<std::string, std::vector<TransitEvent>> events_;
     std::unordered_map<std::string, FootprintSummary>          cache_;
+
+    static std::string hash_plain(const std::string& key)
+    {
+        // TO-DO: replace std::hash with something stronger later (eg. Argon2/bcrypt)
+        std::hash<std::string> h;
+        auto v = h(key);
+        std::ostringstream oss;
+        oss << std::hex << v;
+        return oss.str();
+    }
 };
