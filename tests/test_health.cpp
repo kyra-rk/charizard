@@ -24,11 +24,11 @@ class HealthServer
         configure_routes(svr, this->store);
         // run server on a background thread
         thread = std::thread([this] { svr.listen("127.0.0.1", port); });
-        
+
         // Poll for server readiness instead of fixed sleep
         httplib::Client cli("127.0.0.1", port);
-        auto start = std::chrono::steady_clock::now();
-        bool ready = false;
+        auto            start = std::chrono::steady_clock::now();
+        bool            ready = false;
         while (!ready)
         {
             auto elapsed = std::chrono::steady_clock::now() - start;
@@ -74,7 +74,7 @@ TEST(CharizardAPI, HealthEndpoint)
     EXPECT_TRUE(j.contains("ok"));
     EXPECT_TRUE(j["ok"].get<bool>());
     EXPECT_EQ(j["service"], "charizard");
-    
+
     // Check for "time" field and that it's numeric
     EXPECT_TRUE(j.contains("time"));
     EXPECT_TRUE(j["time"].is_number());

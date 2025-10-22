@@ -5,10 +5,10 @@
 
 #include <chrono>
 #include <httplib.h>
-#include <nlohmann/json.hpp>
-#include <thread>
-#include <sys/socket.h>
 #include <netinet/in.h>
+#include <nlohmann/json.hpp>
+#include <sys/socket.h>
+#include <thread>
 #include <unistd.h>
 
 using nlohmann::json;
@@ -52,8 +52,7 @@ struct TestServer
     std::thread     th;
     int             port;
 
-    TestServer(IStore& store)
-        : port(find_free_port())
+    TestServer(IStore& store) : port(find_free_port())
     {
         configure_routes(svr, store);
         th = std::thread(
@@ -61,11 +60,11 @@ struct TestServer
             {
                 svr.listen("127.0.0.1", port); // blocks until stop()
             });
-        
+
         // Poll for server readiness instead of fixed sleep
         httplib::Client cli("127.0.0.1", port);
-        auto start = std::chrono::steady_clock::now();
-        bool ready = false;
+        auto            start = std::chrono::steady_clock::now();
+        bool            ready = false;
         while (!ready)
         {
             auto elapsed = std::chrono::steady_clock::now() - start;
