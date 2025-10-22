@@ -21,7 +21,6 @@ class HealthServer
 
     HealthServer()
     {
-        InMemoryStore store;
         configure_routes(svr, store);
         // run server on a background thread
         thread = std::thread([this] { svr.listen("127.0.0.1", port); });
