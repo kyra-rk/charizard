@@ -36,6 +36,7 @@ struct TestServer
     }
 };
 
+// TO-DO: place integration tests in integration/ directory
 TEST(Api, Health)
 {
     InMemoryStore mem;

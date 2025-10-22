@@ -36,6 +36,7 @@ class HealthServer
     }
 };
 
+// TO-DO: place unit tests in unit/ directory
 TEST(CharizardAPI, HealthEndpoint)
 {
     HealthServer server;

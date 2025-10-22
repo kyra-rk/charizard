@@ -28,6 +28,7 @@ FORMAT_PATHS := src include tests
 .PHONY: help configure build run debug release clean distclean rebuild format \
         test test-verbose test-list test-one test-unit test-api build-tests
 
+# TO-DO: update the help message
 help:
 	@echo ""
 	@echo "Make targets:"
