@@ -1,0 +1,31 @@
+Checks: >
+  bugprone-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  modernize-*,
+  cppcoreguidelines-*,
+  clang-analyzer-*,
+  misc-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -modernize-use-trailing-return-type
+
+WarningsAsErrors: 'bugprone-*,performance-*,portability-*,readability-*,modernize-*,clang-analyzer-*'
+
+# Only report diagnostics from our own headers/sources
+HeaderFilterRegex: '^(include|src|tests)/'
+
+# When clang-tidy applies fixes with --format, use .clang-format
+FormatStyle: file
+
+CheckOptions:
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberSuffix
+    value: _
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'

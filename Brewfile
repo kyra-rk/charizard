@@ -1,0 +1,6 @@
+brew "cmake"
+brew "llvm"
+brew "clang-format"
+brew "cppcheck"
+brew "mongo-c-driver"
+brew "mongo-cxx-driver"
