@@ -1,0 +1,174 @@
+#include <gtest/gtest.h>
+#include "storage.hpp"
+
+#include <chrono>
+#include <thread>
+#include <cmath>
+
+using namespace std::chrono;
+
+struct StorageTest : public ::testing::Test
+{
+protected:
+    InMemoryStore store;
+
+    // Return current epoch seconds (same approach as InMemoryStore)
+    std::int64_t now_seconds() const
+    {
+        using clock = std::chrono::system_clock;
+        return duration_cast<std::chrono::seconds>(clock::now().time_since_epoch()).count();
+    }
+
+    TransitEvent make_event(const std::string& user,
+                            const std::string& mode,
+                            double distance_km,
+                            std::int64_t ts_offset_seconds = 0) const
+    {
+        TransitEvent ev;
+        ev.user_id = user;
+        ev.mode = mode;
+        ev.distance_km = distance_km;
+        ev.ts = now_seconds() + ts_offset_seconds;
+        return ev;
+    }
+
+    static double kg_for(const std::string& mode, double km)
+    {
+        return emission_factor_for(mode) * km;
+    }
+
+    static constexpr double EPS = 1e-9;
+};
+
+// --- API key tests (set_api_key / check_api_key) ----------------------------
+
+TEST_F(StorageTest, ApiKey_SetAndCheck_ValidAndInvalid)
+{
+    // typical valid set + check
+    store.set_api_key("alice", "secret1", "appA");
+    EXPECT_TRUE(store.check_api_key("alice", "secret1"));
+
+    // invalid key for same user
+    EXPECT_FALSE(store.check_api_key("alice", "badkey"));
+
+    // unknown user
+    EXPECT_FALSE(store.check_api_key("bob", "secret1"));
+
+    // updating key should work (overwrite)
+    store.set_api_key("alice", "secret2");
+    EXPECT_FALSE(store.check_api_key("alice", "secret1"));
+    EXPECT_TRUE(store.check_api_key("alice", "secret2"));
+}
+
+// --- add_event / get_events tests ------------------------------------------
+
+TEST_F(StorageTest, AddAndGetEvents_SingleAndMultiple)
+{
+    auto e1 = make_event("u1", "car", 10.0, -3600); // 1 hour ago
+    store.add_event(e1);
+
+    auto v = store.get_events("u1");
+    ASSERT_EQ(v.size(), 1u);
+    EXPECT_EQ(v[0].user_id, "u1");
+    EXPECT_EQ(v[0].mode, "car");
+    EXPECT_DOUBLE_EQ(v[0].distance_km, 10.0);
+
+    // add another for same user and one for different user
+    auto e2 = make_event("u1", "bus", 5.5, -1800);
+    auto e3 = make_event("u2", "bike", 2.0, -100);
+    store.add_event(e2);
+    store.add_event(e3);
+
+    auto v1 = store.get_events("u1");
+    auto v2 = store.get_events("u2");
+    ASSERT_EQ(v1.size(), 2u);
+    ASSERT_EQ(v2.size(), 1u);
+
+    // ensure events preserved (order is insertion order)
+    EXPECT_EQ(v1[0].mode, "car");
+    EXPECT_EQ(v1[1].mode, "bus");
+}
+
+// --- summarize tests (typical / atypical / empty) --------------------------
+
+TEST_F(StorageTest, Summarize_TypicalAtypicalAndEmpty)
+{
+    // Empty user -> zeros
+    auto s_empty = store.summarize("nouser");
+    EXPECT_DOUBLE_EQ(s_empty.lifetime_kg_co2, 0.0);
+    EXPECT_DOUBLE_EQ(s_empty.week_kg_co2, 0.0);
+    EXPECT_DOUBLE_EQ(s_empty.month_kg_co2, 0.0);
+
+    // Prepare events:
+    // - recent (within week): 10 km taxi
+    // - week-old (8 days ago): 20 km car (should count for lifetime, month but not week)
+    // - month-old (40 days ago): 5 km bus (should only count for lifetime)
+    auto ev_recent = make_event("charlie", "taxi", 10.0, -2 * 24 * 3600);   // 2 days ago
+    auto ev_weekold = make_event("charlie", "car", 20.0, -8 * 24 * 3600);   // 8 days ago
+    auto ev_monthold = make_event("charlie", "bus", 5.0, -40 * 24 * 3600);  // 40 days ago
+
+    store.add_event(ev_recent);
+    store.add_event(ev_weekold);
+    store.add_event(ev_monthold);
+
+    auto s = store.summarize("charlie");
+
+    double expected_recent = kg_for("taxi", 10.0);   // should be in week & month & lifetime
+    double expected_weekold = kg_for("car", 20.0);   // month & lifetime but not week
+    double expected_monthold = kg_for("bus", 5.0);   // lifetime only
+
+    double expect_lifetime = expected_recent + expected_weekold + expected_monthold;
+    double expect_week = expected_recent;
+    double expect_month = expected_recent + expected_weekold;
+
+    EXPECT_NEAR(s.lifetime_kg_co2, expect_lifetime, EPS);
+    EXPECT_NEAR(s.week_kg_co2, expect_week, EPS);
+    EXPECT_NEAR(s.month_kg_co2, expect_month, EPS);
+}
+
+// --- summarize cache invalidation test ------------------------------------
+
+TEST_F(StorageTest, Summarize_CacheInvalidationAfterAddEvent)
+{
+    // Start with one event
+    auto e1 = make_event("dave", "train", 30.0, -3600);
+    store.add_event(e1);
+
+    auto s1 = store.summarize("dave");
+    double expected1 = kg_for("train", 30.0);
+    EXPECT_NEAR(s1.lifetime_kg_co2, expected1, EPS);
+
+    // Add another event and ensure summarize reflects the new total (cache invalidated)
+    auto e2 = make_event("dave", "car", 10.0, -100);
+    store.add_event(e2);
+
+    auto s2 = store.summarize("dave");
+    double expected2 = expected1 + kg_for("car", 10.0);
+    EXPECT_NEAR(s2.lifetime_kg_co2, expected2, EPS);
+    EXPECT_GT(s2.lifetime_kg_co2, s1.lifetime_kg_co2);
+}
+
+// --- global_average_weekly tests -------------------------------------------
+
+TEST_F(StorageTest, GlobalAverageWeekly_NoUsersOneUserMultipleUsers)
+{
+    // no users -> 0.0
+    EXPECT_DOUBLE_EQ(store.global_average_weekly(), 0.0);
+
+    // one user with two recent events
+    auto a1 = make_event("uA", "car", 10.0, -3600);
+    auto a2 = make_event("uA", "bus", 5.0, -3600);
+    store.add_event(a1);
+    store.add_event(a2);
+
+    double uA_week = kg_for("car", 10.0) + kg_for("bus", 5.0);
+    EXPECT_NEAR(store.global_average_weekly(), uA_week, 1e-9);
+
+    // add a second user with one recent event
+    auto b1 = make_event("uB", "taxi", 8.0, -3600);
+    store.add_event(b1);
+    double uB_week = kg_for("taxi", 8.0);
+
+    double expected_avg = (uA_week + uB_week) / 2.0;
+    EXPECT_NEAR(store.global_average_weekly(), expected_avg, 1e-9);
+}
