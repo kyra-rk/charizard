@@ -1,0 +1,145 @@
+#include <gtest/gtest.h>
+#include <gmock/gmock.h>
+
+#define CPPHTTPLIB_THREAD_POOL_COUNT 2
+#include <httplib.h>
+#include <nlohmann/json.hpp>
+
+#include "api.hpp"
+#include "storage.hpp"
+
+#include <thread>
+#include <chrono>
+#include <stdexcept>
+
+// POSIX socket helpers to pick an ephemeral port (helpful for CI/parallel runs)
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+using ::testing::_;
+using ::testing::Return;
+using nlohmann::json;
+
+// helper to find a free ephemeral port.
+static int find_free_port()
+{
+    int sock = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0)
+        throw std::runtime_error("socket() failed");
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1
+    addr.sin_port = 0;                              // ask OS for a free port
+
+    if (bind(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+        ::close(sock);
+        throw std::runtime_error("bind() failed");
+    }
+
+    if (listen(sock, 1) < 0) {
+        ::close(sock);
+        throw std::runtime_error("listen() failed");
+    }
+
+    socklen_t len = sizeof(addr);
+    if (getsockname(sock, reinterpret_cast<sockaddr*>(&addr), &len) < 0) {
+        ::close(sock);
+        throw std::runtime_error("getsockname() failed");
+    }
+
+    int port = ntohs(addr.sin_port);
+    ::close(sock);
+    return port;
+}
+
+// Google Mock implementation of IStore for unit-testing handlers.
+struct MockStore : public IStore {
+    MOCK_METHOD(void, set_api_key, (const std::string&, const std::string&, const std::string&), (override));
+    MOCK_METHOD(bool, check_api_key, (const std::string&, const std::string&), (const, override));
+    MOCK_METHOD(void, add_event, (const TransitEvent&), (override));
+    MOCK_METHOD(std::vector<TransitEvent>, get_events, (const std::string&), (const, override));
+    MOCK_METHOD(FootprintSummary, summarize, (const std::string&), (override));
+    MOCK_METHOD(double, global_average_weekly, (), (override));
+};
+
+// Helper that runs a httplib::Server with routes configured against a store mock.
+// It starts the server on a background thread and waits until /health responds.
+struct InlineTestServer {
+    httplib::Server svr;
+    std::thread     th;
+    int             port = 0;
+
+    InlineTestServer(IStore& store)
+    {
+        port = find_free_port();
+        configure_routes(svr, store);
+
+        th = std::thread([this] {
+            svr.listen("127.0.0.1", port);
+        });
+
+        // readiness poll for /health
+        httplib::Client cli("127.0.0.1", port);
+        const auto start = std::chrono::steady_clock::now();
+        const auto timeout = std::chrono::seconds(5);
+        while (std::chrono::steady_clock::now() - start < timeout) {
+            auto res = cli.Get("/health");
+            if (res && res->status == 200) {
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+
+        // failed to start
+        svr.stop();
+        if (th.joinable()) th.join();
+        throw std::runtime_error("server failed to start");
+    }
+
+    ~InlineTestServer()
+    {
+        svr.stop();
+        if (th.joinable()) th.join();
+    }
+};
+
+//test: verify that GET /users/alice/lifetime-footprint calls summarize()
+TEST(ApiSimple, LifetimeFootprint_UsesStoreSummary)
+{
+    MockStore mock;
+
+    // Arrange:
+    // - handler will call check_api_key("alice", <header-value>) before summarize
+    EXPECT_CALL(mock, check_api_key("alice", _)).WillOnce(Return(true));
+
+    // - when summarize("alice") is called, return a known summary.
+    FootprintSummary fake{ 12.34 /*lifetime*/, 1.23 /*week*/, 3.21 /*month*/ };
+    EXPECT_CALL(mock, summarize("alice")).WillOnce(Return(fake));
+
+    // Start server wired to mock store
+    InlineTestServer server(mock);
+
+    // Act: call the lifetime-footprint endpoint for user "alice", sending X-API-Key header
+    httplib::Client cli("127.0.0.1", server.port);
+    httplib::Headers headers = { { "X-API-Key", "test-key" } };
+    auto res = cli.Get("/users/alice/lifetime-footprint", headers);
+
+    // Assert: response exists and status is OK
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 200);
+
+    // Parse JSON and verify it contains the expected numbers.
+    // api.cpp returns keys "lifetime_kg_co2", "last_7d_kg_co2", "last_30d_kg_co2"
+    auto j = json::parse(res->body);
+    EXPECT_TRUE(j.contains("lifetime_kg_co2"));
+    EXPECT_TRUE(j.contains("last_7d_kg_co2"));
+    EXPECT_TRUE(j.contains("last_30d_kg_co2"));
+
+    EXPECT_DOUBLE_EQ(j["lifetime_kg_co2"].get<double>(), fake.lifetime_kg_co2);
+    EXPECT_DOUBLE_EQ(j["last_7d_kg_co2"].get<double>(),   fake.week_kg_co2);
+    EXPECT_DOUBLE_EQ(j["last_30d_kg_co2"].get<double>(),  fake.month_kg_co2);
+}
