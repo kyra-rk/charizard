@@ -104,6 +104,7 @@ void configure_routes(httplib::Server& svr, IStore& store)
 
         nlohmann::json body;
         try { body = nlohmann::json::parse(req.body); } catch (...) { return json_response(res, {{"error","invalid_json"}}, 400); }
+        // TO-DO: we should probably have an enum on this `mode` field...
         if (!body.contains("mode") || !body.contains("distance_km")) return json_response(res, {{"error","missing_fields"}}, 400);
         TransitEvent ev; ev.user_id = user_id; ev.mode = body["mode"].get<std::string>(); ev.distance_km = body["distance_km"].get<double>();
         ev.ts = body.value("ts", static_cast<std::int64_t>(now_epoch()));

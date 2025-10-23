@@ -78,7 +78,7 @@ target_link_libraries(charizard_api_obj PRIVATE
 
 # Unit test target
 add_executable(charizard_unit_tests
-  tests/test_health.cpp
+  tests/unit/test_health.cpp
   $<TARGET_OBJECTS:charizard_api_obj>
   # Any other unit test files to compile and run
 )
@@ -92,7 +92,7 @@ add_test(NAME unit COMMAND charizard_unit_tests)
 
 # Integration (HTTP) test target
 add_executable(charizard_api_tests
-  tests/test_api.cpp
+  tests/integration/test_api.cpp
   $<TARGET_OBJECTS:charizard_api_obj>
   # Any other integration test files to compile and run
 )
