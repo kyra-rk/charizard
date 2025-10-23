@@ -17,75 +17,15 @@ High level overview of possible clients likely to use our service:
 
 1) Personal Transportation Tracker App
 - Use case: mobile or desktop app for individuals to submit activities, fetch a personal footprint, and receive reduction tips.
-- Typical API calls: POST /users/{id}/transit, GET /users/{id}/lifetime-footprint, GET /users/{id}/suggestions
+- Typical API calls: `POST /users/{id}/transit`, `GET /users/{id}/lifetime-footprint`, `GET /users/{id}/suggestions`
 
 1) Corporate Sustainability Dashboard
 - Use case: businesses upload employee transportation reports (flights, buses, company shuttles) and pull anonymized, aggregated analytics to track organizational trends and identify high-emission behaviors.
-- Typical API calls: POST /users/{id}/transit for batch reports, GET /users/{id}/analytics for aggregated insights
+- Typical API calls: `POST /users/{id}/transit` for batch reports, `GET /users/{id}/analytics` for aggregated insights
 
 1) School Sustainability Dashboard
 - Use case: schools and universities push student travel data (school-sponsored trips) and pull anonymized reports to measure and report on campus sustainability efforts.
-- Typical API calls mirror the Corporate dashboard flow: POST /users/{id}/transit and GET /users/{id}/analytics
-
-
-## Development
-Development Tools:
-- [cpp-httplib](https://github.com/yhirose/cpp-httplib): An easy RESTful API library for C++ developers
-- MongoDB: A document database for persistent storage of carbon footprint data
-- CMake and Make: Build/dependency manager
-- GoogleTest: Testing framework for unit and integration tests
-- `.clang-format` and `.clang-tidy`: Lint and check style
-
-## Running the Service
-Running the program is simple:
-    $ brew bundle
-    $ make build && make run
-
-For convenience during development you can use the provided helper script which exports a temporary `ADMIN_API_KEY` and runs the server:
-    $ ./scripts/dev-start.sh
-
-From there, you can send the service API requests via `curl` or any tool of your choice. For example,
-
-    $ curl -s http://localhost:8080/health | jq
-    {
-       "ok": true,
-       "service": "charizard",
-       "time": 1761091516
-    }
-
-## Development
-The `Makefile` lets you use many shortcuts to conveniently build the service with different
-configurations as needed. To see a full menu of available targets, run
-
-    $ make help
-
-To build the service, run
-
-    make build
-
-To run the executable, run
-
-    make run
-
-To run through tests, run
-
-    make test # or make test-verbose
-
-You can also rebuild the service by running
-
-    make rebuild # this will be useful when you edit something
-
-To run the style checker, run
-
-    make format
-
-To perform a static analysis on your code, run
-
-    make lint
-
-If your lint errors are easy enough to fix, you can run
-
-    make lint-fix
+- Typical API calls mirror the Corporate dashboard flow: `POST /users/{id}/transit` and `GET /users/{id}/analytics`
 
 ## Client Endpoints
 
@@ -94,10 +34,10 @@ This section documents the operational entry points that clients (apps) and deve
 For every client endpoint, the following needs to be taken cared of: 
 - Authentication: client endpoints require the API key produced at registration to be sent in the `X-API-Key` HTTP header. Example: `X-API-Key: <api_key>`.
 - Request/response format: all bodies for documented endpoints use JSON; responses are JSON and error responses follow the shape `{ "error": "<reason>" }`.
-- Logging: every request is recorded (timestamp, method, path, status, duration, client IP, user_id) and persisted to the configured store (in-memory, for testing, or on MongoDB).
+- Logging: every request is recorded (`timestam`, `method`, `path`, `status`, `duration`, `client_IP`, `user_id`) and persisted to the configured store (in-memory, for testing, or on MongoDB).
 
 ### Health Endpoints
-  - Path: GET /health
+  - Path: `GET /health`
   - Auth: none
   - Input: none
   - Output: 200 OK JSON: `{ "ok": true, "service": "charizard", "time": <unix_epoch> }`
@@ -105,7 +45,7 @@ For every client endpoint, the following needs to be taken cared of:
   - Errors: none (returns 200 when reachable)
 
 ### Register Endpoints (join as a client)
-  - Path: POST /users/register
+  - Path: `POST /users/register`
   - Auth: none
   - Input: JSON `{ "app_name": "your_app_name" }` (app_name is required string)
   - Output: 201 Created JSON `{ "user_id": "u_<...>", "api_key": "<raw_api_key>", "app_name": "your_app_name" }`
@@ -116,7 +56,7 @@ For every client endpoint, the following needs to be taken cared of:
       - 400 Bad Request — invalid JSON or missing/invalid `app_name` (error codes: `invalid_json`, `missing_app_name`)
 
 ### Transit Event Endpoint
-  - Path: POST /users/:user_id/transit
+  - Path: `POST /users/:user_id/transit`
   - Auth: required — set header `X-API-Key: <api_key>` matching the `user_id`.
   - Input: JSON `{ "mode": "car|bus|bike|walk|...", "distance_km": <number>, "ts": <optional unix epoch> }`
       - `mode` must be a string. `distance_km` must be a number (kilometers). `ts` is optional; if omitted server will set the event timestamp to current time.
@@ -129,7 +69,7 @@ For every client endpoint, the following needs to be taken cared of:
       - 404 Not Found — malformed path (error: `bad_path`)
 
 ### Lifetime Footprint Endpoint
-  - Path: GET /users/:user_id/lifetime-footprint
+  - Path: `GET /users/:user_id/lifetime-footprint`
   - Auth: required — `X-API-Key: <api_key>`
   - Input: none
   - Output: 200 OK JSON `{ "user_id": "u_...", "lifetime_kg_co2": <number>, "last_7d_kg_co2": <number>, "last_30d_kg_co2": <number> }`
@@ -141,7 +81,7 @@ For every client endpoint, the following needs to be taken cared of:
       - 404 Not Found for malformed path
 
 ### Suggestions Endpoint
-  - Path: GET /users/:user_id/suggestions
+  - Path: `GET /users/:user_id/suggestions`
   - Auth: required — `X-API-Key: <api_key>`
   - Input: none
   - Output: 200 OK JSON `{ "user_id": "u_...", "suggestions": ["...", ...] }`
@@ -150,7 +90,7 @@ For every client endpoint, the following needs to be taken cared of:
   - Status codes / errors: 200 OK, or 401 Unauthorized, or 404 Bad Path
 
 ### Analytics Endpoint
-  - Path: GET /users/:user_id/analytics
+  - Path: `GET /users/:user_id/analytics`
   - Auth: required — `X-API-Key: <api_key>`
   - Input: none
   - Output: 200 OK JSON `{ "user_id": "u_...", "this_week_kg_co2": <number>, "peer_week_avg_kg_co2": <number>, "above_peer_avg": <bool> }`
@@ -172,17 +112,17 @@ Register and then submit transit events:
 
 ```bash
 # Register and capture the generated credentials
-curl -s -X POST http://localhost:8080/users/register \
+$ curl -s -X POST http://localhost:8080/users/register \
     -H 'Content-Type: application/json' \
     -d '{"app_name":"my-dev-app"}' | jq
 
 # Use the returned user_id and api_key in subsequent calls
-curl -X POST http://localhost:8080/users/<user_id>/transit \
+$ curl -X POST http://localhost:8080/users/<user_id>/transit \
     -H "Content-Type: application/json" \
     -H "X-API-Key: <api_key>" \
     -d '{"mode":"car","distance_km":5.2}'
 
-curl -H "X-API-Key: <api_key>" http://localhost:8080/users/<user_id>/lifetime-footprint | jq
+$ curl -H "X-API-Key: <api_key>" http://localhost:8080/users/<user_id>/lifetime-footprint | jq
 ```
 
 ### Ordering & operational caveats:
@@ -199,24 +139,24 @@ Before starting the server you should export a secret value for `ADMIN_API_KEY`.
 
 Example (temporary, development use):
 
+Set the admin key for this shell session and start the server
 ```bash
-# Set the admin key for this shell session and start the server
-export ADMIN_API_KEY=changeme_admin_key_please_replace
-make run
+$ export ADMIN_API_KEY=changeme_admin_key_please_replace
+$ make run
 ```
 
 Use the admin key as a Bearer token in the `Authorization` header when calling admin endpoints. For example, to list stored logs:
 
 ```bash
-curl -H "Authorization: Bearer changeme_admin_key_please_replace" \
+$ curl -H "Authorization: Bearer changeme_admin_key_please_replace" \
     http://localhost:8080/admin/logs | jq
 ```
 
-Notes:
+### Notes:
 - Creating a `.env` file in the repository will not automatically export variables into a running process. Either export the variable in your shell before starting the server, or start the process with the variable inline (for one-off runs):
 
 ```bash
-ADMIN_API_KEY=changeme_admin_key_please_replace make run
+$ ADMIN_API_KEY=changeme_admin_key_please_replace make run
 ```
 
 - The admin key is checked at server startup via `getenv("ADMIN_API_KEY")`. If the environment variable is not present when the server starts, calls to admin endpoints will return 401 Unauthorized.
@@ -227,20 +167,84 @@ Replace `changeme_admin_key_please_replace` with your exported admin key.
 
 ```bash
 # List logs (GET /admin/logs)
-curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/logs | jq
+$ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/logs | jq
 
 # Delete logs (DELETE /admin/logs)
-curl -X DELETE -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/logs
+$ curl -X DELETE -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/logs
 
 # List registered clients (GET /admin/clients)
-curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clients | jq
+$ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clients | jq
 
 # Get a client's stored events (GET /admin/clients/<user_id>/data)
-curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clients/<user_id>/data | jq
+$ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clients/<user_id>/data | jq
 
 # Clear only events collection (GET /admin/clear-db-events)
-curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clear-db-events
+$ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clear-db-events
 
 # Clear entire DB (events, api_keys, logs) (GET /admin/clear-db)
-curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clear-db
+$ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clear-db
+```
+
+## Development
+Development Tools:
+- [cpp-httplib](https://github.com/yhirose/cpp-httplib): An easy RESTful API library for C++ developers
+- MongoDB: A document database for persistent storage of carbon footprint data
+- CMake and Make: Build/dependency manager
+- GoogleTest: Testing framework for unit and integration tests
+- `.clang-format` and `.clang-tidy`: Lint and check style
+
+## Building & Running the Service
+The `Makefile` lets you use many shortcuts to conveniently build the service with different
+configurations as needed. To see a full menu of available targets, run
+
+    $ make help
+
+To build the service, run
+
+    $ make build
+
+To run the executable, run
+
+    $ make run
+
+To run through tests, run
+
+    $ make test # or make test-verbose
+
+You can also rebuild the service by running
+
+    $ make rebuild # this will be useful when you edit something
+
+To run the style checker, run
+
+    $ make format
+
+To perform a static analysis on your code, run
+
+    $ make lint
+
+If your lint errors are easy enough to fix, you can run
+
+    $ make lint-fix
+
+## Fast-Path
+Running the program is simple:
+```
+  $ brew bundle
+  $ make build && make run
+```
+
+For convenience during development you can use the provided helper script which exports a temporary `ADMIN_API_KEY` and runs the server:
+```
+  $ ./scripts/dev-start.sh
+```
+
+From there, you can send the service API requests via `curl` or any tool of your choice. For example,
+```
+  $ curl -s http://localhost:8080/health | jq
+  {
+      "ok": true,
+      "service": "charizard",
+      "time": 1761091516
+  }
 ```
