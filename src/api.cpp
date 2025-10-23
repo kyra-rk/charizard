@@ -54,6 +54,7 @@ void configure_routes(httplib::Server& svr, IStore& store)
                      return json_response(res, { { "error", "invalid_json" } }, 400);
                  }
 
+				 // we should probably have an enum on this `mode` field...
                  if (!body.contains("mode") || !body.contains("distance_km"))
                      return json_response(res, { { "error", "missing_fields" } }, 400);
 
