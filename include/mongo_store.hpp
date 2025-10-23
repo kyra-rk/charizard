@@ -12,6 +12,7 @@
 #include <mongocxx/uri.hpp>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class MongoStore : public IStore
@@ -21,6 +22,8 @@ class MongoStore : public IStore
         : instance_{}, client_{ mongocxx::uri{ uri } }, db_{ client_[dbname] }
     {
     }
+
+    // API key management
 
     void set_api_key(const std::string& user, const std::string& key,
                      const std::string& app_name = "") override
@@ -62,6 +65,86 @@ class MongoStore : public IStore
         oss << std::hex << h(key);
         return oss.str() == stored_hash;
     }
+
+    // Logging and admin operations
+
+    void append_log(const ApiLogRecord& rec) override
+    {
+        using bsoncxx::builder::basic::kvp;
+        using bsoncxx::builder::basic::make_document;
+        auto coll = db_["api_logs"];
+        coll.insert_one(make_document(kvp("ts", static_cast<long long>(rec.ts)), kvp("method", rec.method),
+                                      kvp("path", rec.path), kvp("status", rec.status),
+                                      kvp("duration_ms", rec.duration_ms), kvp("client_ip", rec.client_ip),
+                                      kvp("user_id", rec.user_id)));
+    }
+
+    std::vector<ApiLogRecord> get_logs(std::size_t limit = 100) const override
+    {
+        using bsoncxx::builder::basic::kvp;
+        using bsoncxx::builder::basic::make_document;
+        std::vector<ApiLogRecord> out;
+        auto                      coll = db_["api_logs"];
+        mongocxx::options::find opts;
+        opts.sort(make_document(kvp("ts", 1)));
+        opts.limit(static_cast<std::int64_t>(limit));
+        auto cursor = coll.find({}, opts);
+        for (auto&& d : cursor)
+        {
+            ApiLogRecord r;
+            r.ts = static_cast<std::int64_t>(d["ts"].get_int64().value);
+            r.method = std::string{ d["method"].get_string().value };
+            r.path = std::string{ d["path"].get_string().value };
+            r.status = static_cast<int>(d["status"].get_int32().value);
+            r.duration_ms = d["duration_ms"].get_double();
+            r.client_ip = std::string{ d["client_ip"].get_string().value };
+            r.user_id = std::string{ d["user_id"].get_string().value };
+            out.push_back(std::move(r));
+        }
+        return out;
+    }
+
+    void clear_logs() override
+    {
+        auto coll = db_["api_logs"];
+        coll.delete_many({});
+    }
+
+    std::vector<std::string> get_clients() const override
+    {
+        std::vector<std::string> out;
+        auto                      coll = db_["events"];
+        // naive: iterate events and collect distinct user_id
+        std::unordered_set<std::string> seen;
+        auto cursor = coll.find({});
+        for (auto&& d : cursor)
+        {
+            const auto uid = std::string{ d["user_id"].get_string().value };
+            if (seen.insert(uid).second)
+                out.push_back(uid);
+        }
+        return out;
+    }
+
+    std::vector<TransitEvent> get_client_data(const std::string& client_id) const override
+    {
+        return get_events(client_id);
+    }
+
+    void clear_db_events() override
+    {
+        auto coll = db_["events"];
+        coll.delete_many({});
+    }
+
+    void clear_db() override
+    {
+        db_["events"].delete_many({});
+        db_["api_keys"].delete_many({});
+        db_["api_logs"].delete_many({});
+    }
+
+    // Helpers for client API calls
 
     void add_event(const TransitEvent& ev) override
     {
