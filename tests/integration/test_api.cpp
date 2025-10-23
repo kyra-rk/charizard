@@ -566,11 +566,7 @@ TEST(ApiFootprint, Success_AccumulatesAndRespectsWindows) {
     EXPECT_GE(w30,  0.0);
     EXPECT_GE(w7,   0.0);
 
-    // Expect monotonic windows given the event placement:
-    //  - last 7d only includes the 2d-ago event  → smallest positive
-    //  - last 30d includes 2d + 10d events      → larger than 7d
-    //  - lifetime includes all three             → largest
-    // (allow equality if implementation rounds tiny values, but should be strictly increasing here)
+	// lifetime > 30d > 7d
     EXPECT_GT(life, w30);
     EXPECT_GT(w30,  w7);
     EXPECT_GT(w7,   0.0);
