@@ -5,6 +5,28 @@ The server stores and aggregates logged data over configurable windows (week, mo
 
 See Github [Issues](https://github.com/kyra-rk/charizard/issues) page for ongoing project management!
 
+## Building & Running the Service
+Running the program is simple:
+```
+  $ brew bundle
+  $ make build && make run
+```
+
+For convenience during development you can use the provided helper script which exports a temporary `ADMIN_API_KEY` and runs the server:
+```
+  $ ./scripts/dev-start.sh
+```
+
+From there, you can send the service API requests via `curl` or any tool of your choice. For example,
+```
+  $ curl -s http://localhost:8080/health | jq
+  {
+      "ok": true,
+      "service": "charizard",
+      "time": 1761091516
+  }
+```
+
 ## Key features
 - Simple registration + API key model for clients
 - Per-event storage of transportation activity and aggregated footprint metrics (weekly/monthly)
@@ -185,7 +207,7 @@ $ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://local
 $ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clear-db
 ```
 
-## Development
+## Development Notes
 Development Tools:
 - [cpp-httplib](https://github.com/yhirose/cpp-httplib): An easy RESTful API library for C++ developers
 - MongoDB: A document database for persistent storage of carbon footprint data
@@ -193,7 +215,6 @@ Development Tools:
 - GoogleTest: Testing framework for unit and integration tests
 - `.clang-format` and `.clang-tidy`: Lint and check style
 
-## Building & Running the Service
 The `Makefile` lets you use many shortcuts to conveniently build the service with different
 configurations as needed. To see a full menu of available targets, run
 
@@ -207,7 +228,7 @@ To run the executable, run
 
     $ make run
 
-To run through tests, run
+To run through all tests, run
 
     $ make test # or make test-verbose
 
@@ -227,24 +248,8 @@ If your lint errors are easy enough to fix, you can run
 
     $ make lint-fix
 
-## Fast-Path
-Running the program is simple:
-```
-  $ brew bundle
-  $ make build && make run
-```
+To run a coverage report on your tests, run
 
-For convenience during development you can use the provided helper script which exports a temporary `ADMIN_API_KEY` and runs the server:
-```
-  $ ./scripts/dev-start.sh
-```
-
-From there, you can send the service API requests via `curl` or any tool of your choice. For example,
-```
-  $ curl -s http://localhost:8080/health | jq
-  {
-      "ok": true,
-      "service": "charizard",
-      "time": 1761091516
-  }
-```
+    $ make build-cov
+    $ make coverage
+    $ make cov-open
