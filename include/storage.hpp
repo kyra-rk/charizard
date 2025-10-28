@@ -14,6 +14,9 @@ struct TransitEvent
     std::string  mode;
     double       distance_km = 0.0;
     std::int64_t ts          = 0;
+    // Default and validating constructor. Implemented in src/transit_validator.cpp
+    TransitEvent() = default;
+    TransitEvent(const std::string& user_id_, const std::string& mode_, double distance_km_, std::int64_t ts_ = 0);
 };
 
 struct ApiLogRecord

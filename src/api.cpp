@@ -1,5 +1,5 @@
 #include "api.hpp"
-#include "api.hpp"
+#include "transit_validator.cpp"
 
 #include <ctime>
 #include <nlohmann/json.hpp>
@@ -105,14 +105,56 @@ void configure_routes(httplib::Server& svr, IStore& store)
         nlohmann::json body;
         try { body = nlohmann::json::parse(req.body); } catch (...) { return json_response(res, {{"error","invalid_json"}}, 400); }
         // TO-DO: we should probably have an enum on this `mode` field...
-        if (!body.contains("mode") || !body.contains("distance_km")) return json_response(res, {{"error","missing_fields"}}, 400);
-        TransitEvent ev; ev.user_id = user_id; ev.mode = body["mode"].get<std::string>(); ev.distance_km = body["distance_km"].get<double>();
-        ev.ts = body.value("ts", static_cast<std::int64_t>(now_epoch()));
-        store.add_event(ev);
+        //if (!body.contains("mode") || !body.contains("distance_km")) return json_response(res, {{"error","missing_fields"}}, 400);
+        
+        // TransitEvent ev; ev.user_id = user_id; ev.mode = body["mode"].get<std::string>(); ev.distance_km = body["distance_km"].get<double>();
+        // ev.ts = body.value("ts", static_cast<std::int64_t>(now_epoch()));
+        try {
+            if (!body.contains("mode") || !body.contains("distance_km"))
+                return json_response(res, {{"error","missing_fields"}}, 400);
+
+            TransitEvent ev(
+                user_id,
+                body["mode"].get<std::string>(),
+                body["distance_km"].get<double>(),
+                body.value("ts", static_cast<std::int64_t>(now_epoch()))
+            ); 
+
+            store.add_event(ev);
+        } catch (const std::runtime_error& e) {
+            return json_response(res, {{"error", e.what()}}, 400);
+        } catch (const nlohmann::json::exception&) {
+            return json_response(res, {{"error","invalid JSON payload"}}, 400);
+        }
+
+        //store.add_event(ev);
         json_response(res, {{"status","ok"}}, 201);
         const auto end = now_epoch();
         record_log(store, req, res, user_id, start, static_cast<double>((end - start) * 1000));
     });
+
+    // svr.Post(R"(/users/([A-Za-z0-9_\-]+)/transit)", [&](const httplib::Request& req, httplib::Response& res) {
+    // /* regex, auth, and parameter checks */
+    // try {
+    //     if (!body.contains("mode") || !body.contains("distance_km"))
+    //     return json_response(res, {{"error","missing required fields"}}, 400);
+
+    //     TransitEvent ev(
+    //     user_id,
+    //     body["mode"].get<std::string>(),
+    //     body["distance_km"].get<double>(),
+    //     body.value("ts", static_cast<std::int64_t>(now_epoch()))
+    //     ); 
+
+    //     store->add_event(ev);
+    // } catch (const std::runtime_error& e) {
+    //     return json_response(res, {{"error", e.what()}}, 400);
+    // } catch (const nlohmann::json::exception&) {
+    //     return json_response(res, {{"error","invalid JSON payload"}}, 400);
+    // }
+
+    // return json_response(res, {{"status","ok"}}, 201);
+    // });
 
     // Lifetime
     svr.Get(R"(/users/([A-Za-z0-9_\-]+)/lifetime-footprint)", [&](const httplib::Request& req, httplib::Response& res) {

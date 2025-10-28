@@ -423,7 +423,7 @@ TEST(ApiTransit, Success_IntegerDistanceAccepted) {
 }
 
 /* Content-Type variations: server parses req.body regardless of header */
-TEST(ApiTransit, Success_TextPlainWithJsonBody) {
+TEST(ApiTransit, Failure_TextPlainWithJsonBody) {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
     TestServer server(mem);
@@ -434,8 +434,8 @@ TEST(ApiTransit, Success_TextPlainWithJsonBody) {
     auto res = cli.Post("/users/demo/transit", hdrs, body.dump(), "text/plain");
 
     ASSERT_TRUE(res != nullptr);
-    EXPECT_EQ(res->status, 201);
-    EXPECT_EQ(json::parse(res->body).value("status",""), "ok");
+    EXPECT_EQ(res->status, 400);
+    EXPECT_EQ(json::parse(res->body).value("error",""), "invalid mode");
 }
 
 TEST(ApiTransit, InvalidJson_FormEncoded) {
@@ -601,4 +601,45 @@ TEST(ApiFootprint, IgnoresOtherUsersEvents) {
     EXPECT_DOUBLE_EQ(j.value("lifetime_kg_co2", 123.0), 0.0);
     EXPECT_DOUBLE_EQ(j.value("last_7d_kg_co2", 123.0), 0.0);
     EXPECT_DOUBLE_EQ(j.value("last_30d_kg_co2", 123.0), 0.0);
+}
+
+// Integration tests that exercise the TransitEvent validation checks.
+
+TEST(ApiTransit, Validation_NegativeDistance) {
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer server(mem);
+    httplib::Client cli("127.0.0.1", server.port);
+
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(),
+                        R"({"mode":"walk","distance_km":-3.5})", "application/json");
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 400);
+    EXPECT_EQ(json::parse(res->body).value("error", ""), "Negative value for distance_km is not allowed.");
+}
+
+TEST(ApiTransit, Validation_InvalidMode) {
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer server(mem);
+    httplib::Client cli("127.0.0.1", server.port);
+
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(),
+                        R"({"mode":"spaceship","distance_km":1.0})", "application/json");
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 400);
+    EXPECT_EQ(json::parse(res->body).value("error", ""), "invalid mode");
+}
+
+// unit-style integration for empty user_id validation (constructor throws)
+TEST(TransitEventUnit, Validation_EmptyUserIdThrows) {
+    try {
+        TransitEvent ev("", "walk", 1.0, 0);
+        FAIL() << "Expected std::runtime_error to be thrown for empty user_id";
+    } catch (const std::runtime_error& e) {
+        std::string msg(e.what());
+        EXPECT_NE(msg.find("user_id must not be empty"), std::string::npos);
+    } catch (...) {
+        FAIL() << "Expected std::runtime_error";
+    }
 }

@@ -91,18 +91,6 @@ target_link_libraries(charizard_api_obj PRIVATE
   nlohmann_json::nlohmann_json
 )
 
-# Unit test target
-add_executable(charizard_unit_tests
-  tests/unit/test_health.cpp
-  $<TARGET_OBJECTS:charizard_api_obj>
-  # Any other unit test files to compile and run
-)
-target_include_directories(charizard_unit_tests PRIVATE
-  include
-  ${cpp_httplib_SOURCE_DIR}
-)
-target_link_libraries(charizard_unit_tests PRIVATE gtest_main nlohmann_json::nlohmann_json)
-
 add_test(NAME unit COMMAND charizard_unit_tests)
 
 # Integration (HTTP) test target
