@@ -1,3 +1,4 @@
+# ----- PROJECT CONFIGURATION -----
 cmake_minimum_required(VERSION 3.16)
 project(charizard_carbon_api LANGUAGES CXX)
 
@@ -5,18 +6,32 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# ---- OPTIONS ----
+# ----- OPTIONS -----
 option(CHARIZARD_ENABLE_LTO "Enable link-time optimization" ON)
 option(CHARIZARD_WITH_MONGO "Build with MongoDB persistence" ON)
+option(CHARIZARD_ENABLE_COVERAGE "Enable coverage instrumentation" OFF)
 
 if(CHARIZARD_WITH_MONGO)
   find_package(mongocxx CONFIG REQUIRED)
   find_package(bsoncxx CONFIG REQUIRED)
 endif()
 
+function(enable_coverage_for target)
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(${target} PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+    # link options needed so the runtime writes .profraw files
+    if (COMMAND target_link_options)
+      target_link_options(${target} PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+    endif()
+  elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    target_compile_options(${target} PRIVATE --coverage -O0 -g)
+    target_link_libraries(${target} PRIVATE --coverage)
+  endif()
+endfunction()
+
 include(FetchContent)
 
-# ---- Dependencies (header-only) ----
+# ----- DEPENDENCIES -----
 # cpp-httplib (API)
 FetchContent_Declare(
   cpp_httplib
@@ -43,7 +58,7 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-# ---- Target ----
+# ----- TARGETS -----
 add_executable(charizard_api
   src/main.cpp
   src/mongo_store.cpp
@@ -62,7 +77,7 @@ if(CHARIZARD_WITH_MONGO)
   target_link_libraries(charizard_api PRIVATE mongo::mongocxx_shared mongo::bsoncxx_shared)
 endif()
 
-# ---- Testing ----
+# ----- TESTING -----
 # API/library objects to test against
 add_library(charizard_api_obj OBJECT
   src/api.cpp
@@ -104,12 +119,21 @@ target_link_libraries(charizard_api_tests PRIVATE gtest_main nlohmann_json::nloh
 
 add_test(NAME api COMMAND charizard_api_tests)
 
+# ---- TEST COVERAGE ----
+if (CHARIZARD_ENABLE_COVERAGE)
+  message(STATUS "Building with coverage instrumentation enabled")
+  enable_coverage_for(charizard_api_obj)
+  enable_coverage_for(charizard_api)
+  enable_coverage_for(charizard_unit_tests)
+  enable_coverage_for(charizard_api_tests)
+endif()
+
 # macOS: enable rpath for convenience
 set_target_properties(charizard_api PROPERTIES
   MACOSX_RPATH ON
 )
 
-# LTO
+# ----- LINK TIME OPTIMIZATION -----
 if(CHARIZARD_ENABLE_LTO AND CMAKE_BUILD_TYPE STREQUAL "Release")
   include(CheckIPOSupported)
   check_ipo_supported(RESULT ipo_supported OUTPUT error)
@@ -118,7 +142,7 @@ if(CHARIZARD_ENABLE_LTO AND CMAKE_BUILD_TYPE STREQUAL "Release")
   endif()
 endif()
 
-# ---- style checking / linting ----
+# ---- STYLE CHECKING / LINTING ----
 if(DEFINED CLANG_TIDY AND CLANG_TIDY)
   find_program(CLANG_TIDY_BIN NAMES clang-tidy clang-tidy-18 clang-tidy-17 PATHS /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin)
   if(CLANG_TIDY_BIN)
