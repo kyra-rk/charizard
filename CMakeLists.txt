@@ -76,18 +76,6 @@ target_link_libraries(charizard_api_obj PRIVATE
   nlohmann_json::nlohmann_json
 )
 
-# Unit test target
-add_executable(charizard_unit_tests
-  tests/unit/test_health.cpp
-  $<TARGET_OBJECTS:charizard_api_obj>
-  # Any other unit test files to compile and run
-)
-target_include_directories(charizard_unit_tests PRIVATE
-  include
-  ${cpp_httplib_SOURCE_DIR}
-)
-target_link_libraries(charizard_unit_tests PRIVATE gtest_main nlohmann_json::nlohmann_json)
-
 add_test(NAME unit COMMAND charizard_unit_tests)
 
 # Integration (HTTP) test target
@@ -132,24 +120,3 @@ if(DEFINED CLANG_TIDY AND CLANG_TIDY)
     message(WARNING "Requested CLANG_TIDY=ON but clang-tidy not found")
   endif()
 endif()
-
-# ---- GoogleTest setup ----
-find_package(GTest REQUIRED)
-include(GoogleTest)
-
-# Add your test executable (all .cpp files that contain TEST or TEST_F)
-add_executable(run_all_tests
-    test_memory.cpp
-    test_utils.cpp
-    test_api_handler.cpp
-)
-
-target_link_libraries(run_all_tests
-    PRIVATE
-    GTest::gtest
-    GTest::gtest_main
-    pthread
-)
-
-# Enable test discovery
-gtest_discover_tests(run_all_tests)
