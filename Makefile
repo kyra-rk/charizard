@@ -46,9 +46,9 @@ LLVM_PROFDATA?= $(LLVM_BIN)/llvm-profdata
 CORES := $(shell (sysctl -n hw.ncpu 2>/dev/null) || (nproc 2>/dev/null) || echo 4)
 
 # ---------- Phony ----------
-.PHONY: help configure build run debug release clean distclean rebuild \
-        test test-verbose test-list test-one test-unit test-api build-tests \
-        format format-check lint lint-fix check coverage cov-open
+.PHONY: help configure build build-cov run debug release clean distclean \
+        rebuild test test-verbose test-list test-one test-unit test-api \
+        build-tests format format-check lint lint-fix check coverage cov-open
 
 # ---------- Help ----------
 help:
@@ -57,6 +57,7 @@ help:
 	@echo "  Build & Run:"
 	@echo "    build           Configure (if needed) and build ($(CONFIG))"
 	@echo "    run             Build then run the server (HOST=$(HOST) PORT=$(PORT))"
+	@echo "    build-cov	   Configure build with coverage instrumentation"
 	@echo ""
 	@echo "  Testing:"
 	@echo "    test            Build and run all CTest tests ($(CTEST_FLAGS))"
@@ -95,6 +96,13 @@ configure:
 
 build: configure
 	@cmake --build $(BUILD_DIR) -j
+
+build-cov:
+	@mkdir -p $(BUILD_DIR)
+	@echo "==> Configuring build with coverage instrumentation..."
+	@cmake -S . -B $(BUILD_DIR) \
+	  -DCMAKE_BUILD_TYPE=Debug \
+	  -DCHARIZARD_ENABLE_COVERAGE=ON
 
 # Build tests explicitly (alias of build; handy in CI)
 build-tests: build

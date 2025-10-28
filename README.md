@@ -250,8 +250,6 @@ If your lint errors are easy enough to fix, you can run
 
 To run a coverage report on your tests, run
 
+    $ make build-cov
     $ make coverage
-
-To open the HTML version of the coverage report, run
-
     $ make cov-open
