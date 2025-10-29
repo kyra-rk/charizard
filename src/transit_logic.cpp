@@ -19,5 +19,5 @@ make_transit_event_from_json(const std::string& user_id, const nlohmann::json& b
         body.value("ts", now_epoch == 0 ? static_cast<std::int64_t>(std::time(nullptr)) : now_epoch);
 
     // Delegate validation to the existing TransitEvent ctor in transit_validator.cpp
-    return TransitEvent(user_id, mode, distance, ts);
+    return { user_id, mode, distance, ts };
 }

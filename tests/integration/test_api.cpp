@@ -11,19 +11,11 @@
 
 using nlohmann::json;
 
-// Many tests intentionally create non-const InMemoryStore instances which are
-// passed by non-const reference into the test HTTP server. The misc-const-correctness
-// clang-tidy check can be noisy here; disable that check for this file.
-// NOLINTBEGIN(misc-const-correctness)
-
 static bool is_hex(const std::string& s)
 {
     static const std::regex re("^[0-9a-fA-F]+$");
     return std::regex_match(s, re);
 }
-
-// Re-enable misc-const-correctness
-// NOLINTEND(misc-const-correctness)
 
 static httplib::Headers demo_auth_headers()
 {
