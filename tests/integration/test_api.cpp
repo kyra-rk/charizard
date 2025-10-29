@@ -555,11 +555,10 @@ TEST(ApiFootprint, Success_AccumulatesAndRespectsWindows) {
     // - 2 days ago: distance 1
     // - 10 days ago: distance 2
     // - 40 days ago: distance 3
-    // Using same mode so footprint scales proportionally with distance
     const std::time_t now = std::time(nullptr);
-    post_transit(cli, /*distance=*/1.0, "bus",  now - 2 * 24 * 3600);
-    post_transit(cli, /*distance=*/2.0, "bus",  now - 10 * 24 * 3600);
-    post_transit(cli, /*distance=*/3.0, "bus",  now - 40 * 24 * 3600);
+    post_transit(cli, 1.0, "bus",  now - 2 * 24 * 3600);
+    post_transit(cli, 2.0, "bus",  now - 10 * 24 * 3600);
+    post_transit(cli, 3.0, "bus",  now - 40 * 24 * 3600);
 
     auto res = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
     ASSERT_TRUE(res != nullptr);
@@ -723,7 +722,7 @@ TEST(ApiSuggestions, Success_LowEmissions_NoEvents) {
     mem.set_api_key("demo", "secret-demo-key");
     TestServer server(mem);
 
-    // No events posted → summarize().week_kg_co2 should be 0 → "Nice work!" branch
+    // No events posted --> expect "Nice work!" branch
     httplib::Client cli("127.0.0.1", server.port);
     auto res = cli.Get("/users/demo/suggestions", demo_auth_headers());
 
@@ -748,8 +747,7 @@ TEST(ApiSuggestions, Success_HighEmissions_AboveThresholdThisWeek) {
 
     httplib::Client cli("127.0.0.1", server.port);
 
-    // Create enough "car" distance this week to push week_kg_co2 > 20.0
-    // (Car EF typically ~0.2 kg/km; 200 km → ~40 kg; safely above threshold.)
+    // Create enough "car" distance this week to push week_kg_co2 > 20.0 --> expect "Try switching..." branch
     const std::time_t now = std::time(nullptr);
     post_transit(cli, /*distance_km=*/200.0, "car", static_cast<std::int64_t>(now));
 
@@ -789,7 +787,7 @@ TEST(ApiSuggestions, IgnoresOtherUsersWeeklyEmissions) {
         ASSERT_EQ(res_post->status, 201);
     }
 
-    // demo has no events → expect the low-emissions suggestion branch
+    // demo is separate and should have no events --> expect the low-emissions suggestion branch
     auto res = cli.Get("/users/demo/suggestions", demo_auth_headers());
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 200);
@@ -858,7 +856,7 @@ TEST(ApiAnalytics, Unauthorized_WrongKey) {
 
 /* ---------------- Behavior: edge cases ---------------- */
 
-// No one has events → peer avg = 0, user week = 0, above_peer_avg = false
+// No one has events --> peer avg = 0, user week = 0, above_peer_avg = false
 TEST(ApiAnalytics, Success_NoEvents_AllZero) {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
@@ -876,7 +874,7 @@ TEST(ApiAnalytics, Success_NoEvents_AllZero) {
     EXPECT_FALSE(j.value("above_peer_avg", true));
 }
 
-// Only demo has events this week → peer avg includes demo; equal to demo's week
+// Only demo has events this week --> peer avg includes demo; equal to demo's week
 TEST(ApiAnalytics, Success_OnlyDemoHasEvents_PeerAvgEqualsUser) {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
@@ -884,8 +882,9 @@ TEST(ApiAnalytics, Success_OnlyDemoHasEvents_PeerAvgEqualsUser) {
     httplib::Client cli("127.0.0.1", server.port);
 
     const std::time_t now = std::time(nullptr);
-    // Post any weekly event; use "bus" to keep linearity and avoid mode validation surprises
-    post_transit(cli, /*distance_km=*/10.0, "bus", static_cast<std::int64_t>(now));
+
+	// post event for demo
+    post_transit(cli, 10.0, "bus", static_cast<std::int64_t>(now));
 
     auto res = cli.Get("/users/demo/analytics", demo_auth_headers());
     ASSERT_TRUE(res != nullptr);
@@ -900,10 +899,10 @@ TEST(ApiAnalytics, Success_OnlyDemoHasEvents_PeerAvgEqualsUser) {
 
     // With only one active user, average == user
     EXPECT_NEAR(u, p, 1e-9);
-    EXPECT_FALSE(j.value("above_peer_avg", true)); // strictly '>' check → equal -> false
+    EXPECT_FALSE(j.value("above_peer_avg", true));
 }
 
-// Peers have events, demo has none → avg > 0, user == 0, above_peer_avg = false
+// Peers have events, demo has none --> avg > 0, user == 0, above_peer_avg = false
 TEST(ApiAnalytics, Success_PeersOnly_DemoZeroAboveFalse) {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
@@ -940,7 +939,7 @@ TEST(ApiAnalytics, Success_PeersOnly_DemoZeroAboveFalse) {
 
 /* ---------------- Behavior: core comparisons ---------------- */
 
-// Demo higher than peers → average includes demo; ratio this_week / peer_avg = 1.5 for (2D vs D, D)
+// Demo higher than peers
 TEST(ApiAnalytics, Success_AbovePeerAvg_WhenHigherThanPeers) {
     InMemoryStore mem;
     mem.set_api_key("demo",   "secret-demo-key");
@@ -950,7 +949,7 @@ TEST(ApiAnalytics, Success_AbovePeerAvg_WhenHigherThanPeers) {
     httplib::Client cli("127.0.0.1", server.port);
     const std::time_t now = std::time(nullptr);
 
-    // Peers each at D, demo at 2D (same mode so EF cancels in ratios)
+    // Peers each at 100 km, demo at 200 km
     {
         json b1 = {{"mode","bus"}, {"distance_km", 100.0}, {"ts", static_cast<std::int64_t>(now)}};
         httplib::Headers h1 = {{"X-API-Key","k1"}, {"Content-Type","application/json"}};
@@ -962,7 +961,7 @@ TEST(ApiAnalytics, Success_AbovePeerAvg_WhenHigherThanPeers) {
         auto r2 = cli.Post("/users/u2/transit", h2, b2.dump(), "application/json");
         ASSERT_TRUE(r2 != nullptr); ASSERT_EQ(r2->status, 201);
 
-        post_transit(cli, /*distance_km=*/200.0, "bus", static_cast<std::int64_t>(now)); // demo
+        post_transit(cli, 200.0, "bus", static_cast<std::int64_t>(now)); // demo
     }
 
     auto res = cli.Get("/users/demo/analytics", demo_auth_headers());
@@ -977,11 +976,10 @@ TEST(ApiAnalytics, Success_AbovePeerAvg_WhenHigherThanPeers) {
     ASSERT_GT(p, 0.0);
     EXPECT_TRUE(j.value("above_peer_avg", false));
 
-    // Expected ratio = (2D*EF) / ((2D + D + D)/3 * EF) = 1.5 (EF cancels)
     EXPECT_NEAR(u / p, 1.5, 1e-6);
 }
 
-// All users have identical weekly totals → peer avg == user; above_peer_avg = false
+// All users have identical weekly totals --> peer avg == user; above_peer_avg = false
 TEST(ApiAnalytics, Success_EqualToPeerAvg_WhenAllEqual) {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
@@ -993,7 +991,7 @@ TEST(ApiAnalytics, Success_EqualToPeerAvg_WhenAllEqual) {
 
     // Give each user the same weekly footprint (same mode, same distance)
     {
-        post_transit(cli, /*distance_km=*/50.0, "bus", static_cast<std::int64_t>(now)); // demo
+        post_transit(cli, 50.0, "bus", static_cast<std::int64_t>(now)); // demo
 
         json b1 = {{"mode","bus"}, {"distance_km", 50.0}, {"ts", static_cast<std::int64_t>(now)}};
         httplib::Headers h1 = {{"X-API-Key","k1"}, {"Content-Type","application/json"}};
@@ -1105,7 +1103,7 @@ TEST(AdminLogs, Logs_AppearAfterValidRequests_ThenCanBeCleared) {
         ASSERT_EQ(r2->status, 201);
     }
 
-    // Admin fetch logs → expect an array with at least the two entries above
+    // Admin fetch logs --> expect an array with at least the two entries above
     auto res = cli.Get("/admin/logs", admin_auth_headers());
     ASSERT_TRUE(res != nullptr);
     ASSERT_EQ(res->status, 200);
@@ -1114,7 +1112,6 @@ TEST(AdminLogs, Logs_AppearAfterValidRequests_ThenCanBeCleared) {
     ASSERT_GE(arr.size(), 2u);
 
     // Spot-check a couple of fields on the latest log entries
-    // (Most recent should be the POST /users/demo/transit above, depending on your recorder.)
     bool saw_transit = false, saw_lifetime = false;
     for (const auto& item : arr) {
         if (!item.is_object()) continue;
@@ -1133,7 +1130,7 @@ TEST(AdminLogs, Logs_AppearAfterValidRequests_ThenCanBeCleared) {
     EXPECT_EQ(del->status, 200);
     EXPECT_EQ(json::parse(del->body).value("status",""), "ok");
 
-    // Logs should now be empty (or at least smaller). Expect empty array if your store clears all.
+    // Logs should now be empty --> expect empty array
     auto res2 = cli.Get("/admin/logs", admin_auth_headers());
     ASSERT_TRUE(res2 != nullptr);
     ASSERT_EQ(res2->status, 200);
@@ -1154,7 +1151,7 @@ TEST(AdminClients, Clients_EmptyUntilTransitEventsExist) {
     TestServer server(mem);
     httplib::Client cli("127.0.0.1", server.port);
 
-    // No events yet → expect empty list
+    // No events yet --> expect empty list
     auto res0 = cli.Get("/admin/clients", admin_auth_headers());
     ASSERT_TRUE(res0 != nullptr);
     ASSERT_EQ(res0->status, 200);
@@ -1257,7 +1254,7 @@ TEST(AdminDb, ClearDbEvents_RemovesOnlyEvents_AfterwardsClientsEmpty) {
     EXPECT_EQ(clr->status, 200);
     EXPECT_EQ(json::parse(clr->body).value("status",""), "ok");
 
-    // Clients should now be empty (no events → no active clients)
+    // Clients should now be empty (no events --> no active clients)
     auto after = cli.Get("/admin/clients", admin_auth_headers());
     ASSERT_TRUE(after != nullptr);
     ASSERT_EQ(after->status, 200);
