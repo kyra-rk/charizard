@@ -81,6 +81,9 @@ endif()
 # API/library objects to test against
 add_library(charizard_api_obj OBJECT
   src/api.cpp
+  src/transit_validator.cpp
+  src/transit_logic.cpp
+  src/test_auth_helpers.cpp
   # Any other non-main sources that define logic you want to reuse in tests
 )
 target_include_directories(charizard_api_obj PRIVATE 
@@ -94,6 +97,8 @@ target_link_libraries(charizard_api_obj PRIVATE
 # Unit test target
 add_executable(charizard_unit_tests
   tests/unit/test_health.cpp
+  tests/unit/test_transit_logic.cpp
+  tests/unit/test_auth.cpp
   $<TARGET_OBJECTS:charizard_api_obj>
   # Any other unit test files to compile and run
 )
