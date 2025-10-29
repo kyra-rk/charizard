@@ -11,7 +11,9 @@ static const std::vector<std::string> k_allowed_transit_modes = { "taxi",  "car"
 
 // Implement the constructor declared in include/storage.hpp.
 // Validates the inputs and fills defaults (eg. timestamp -> now if 0).
-TransitEvent::TransitEvent(const std::string& user_id_, const std::string& mode_, double distance_km_,
+TransitEvent::TransitEvent(const std::string& user_id_,
+                           const std::string& mode_,
+                           double distance_km_, // NOLINT(bugprone-easily-swappable-parameters)
                            std::int64_t ts_) // NOLINT(bugprone-easily-swappable-parameters)
 {
     // basic sanity checks

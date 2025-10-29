@@ -89,7 +89,6 @@ TEST(ApiHealth, HealthGet)
     EXPECT_TRUE(j["ok"].get<bool>());
 }
 
-
 // Test helper: create a server, post two events for 'demo', and return the parsed array + timestamps
 static std::tuple<json, std::int64_t, std::int64_t> setup_demo_with_two_events()
 {

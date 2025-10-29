@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define CPPHTTPLIB_THREAD_POOL_COUNT 2
 #include "api.hpp"
 #include "storage.hpp"
@@ -13,11 +14,6 @@ using nlohmann::json;
 class HealthServer
 {
   public:
-    InMemoryStore   store;
-    httplib::Server svr;
-    std::thread     thread;
-    int             port = 18080; // change if needed
-
     HealthServer()
     {
         // Use the member `store` so the routes capture a reference that stays alive
@@ -33,6 +29,18 @@ class HealthServer
         if (thread.joinable())
             thread.join();
     }
+
+    // Rule-of-five clarity
+    HealthServer(const HealthServer&)            = delete;
+    HealthServer& operator=(const HealthServer&) = delete;
+    HealthServer(HealthServer&&)                 = delete;
+    HealthServer& operator=(HealthServer&&)      = delete;
+
+  private:
+    InMemoryStore   store;
+    httplib::Server svr;
+    std::thread     thread;
+    int             port = 18080;
 };
 
 // TO-DO: place unit tests in unit/ directory
