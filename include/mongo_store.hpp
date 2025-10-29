@@ -32,7 +32,8 @@ class MongoStore : public IStore
         using bsoncxx::builder::basic::make_document;
         // Store a hashed API key.
         std::hash<std::string> hsh;
-        auto                    h = [&hsh](const std::string& k) {
+        auto                   h = [&hsh](const std::string& k)
+        {
             std::ostringstream oss;
             oss << std::hex << hsh(k);
             return oss.str();
@@ -40,9 +41,10 @@ class MongoStore : public IStore
 
         auto coll = db_["api_keys"];
         // Persist the hash and optional app_name metadata.
-        coll.update_one(make_document(kvp("_id", user)),
-                        make_document(kvp("$set", make_document(kvp("api_key_hash", h), kvp("app_name", app_name)))),
-                        mongocxx::options::update{}.upsert(true));
+        coll.update_one(
+            make_document(kvp("_id", user)),
+            make_document(kvp("$set", make_document(kvp("api_key_hash", h), kvp("app_name", app_name)))),
+            mongocxx::options::update{}.upsert(true));
     }
 
     bool check_api_key(const std::string& user, const std::string& key) const override
@@ -55,13 +57,13 @@ class MongoStore : public IStore
         if (!doc)
             return false;
 
-        auto view = doc->view();
+        auto view    = doc->view();
         auto it_hash = view.find("api_key_hash");
         if (it_hash == view.end())
             return false;
-        const auto stored_hash = std::string{ it_hash->get_string().value };
+        const auto             stored_hash = std::string{ it_hash->get_string().value };
         std::hash<std::string> h;
-        std::ostringstream      oss;
+        std::ostringstream     oss;
         oss << std::hex << h(key);
         return oss.str() == stored_hash;
     }
@@ -85,20 +87,20 @@ class MongoStore : public IStore
         using bsoncxx::builder::basic::make_document;
         std::vector<ApiLogRecord> out;
         auto                      coll = db_["api_logs"];
-        mongocxx::options::find opts;
+        mongocxx::options::find   opts;
         opts.sort(make_document(kvp("ts", 1)));
         opts.limit(static_cast<std::int64_t>(limit));
         auto cursor = coll.find({}, opts);
         for (auto&& d : cursor)
         {
             ApiLogRecord r;
-            r.ts = static_cast<std::int64_t>(d["ts"].get_int64().value);
-            r.method = std::string{ d["method"].get_string().value };
-            r.path = std::string{ d["path"].get_string().value };
-            r.status = static_cast<int>(d["status"].get_int32().value);
+            r.ts          = static_cast<std::int64_t>(d["ts"].get_int64().value);
+            r.method      = std::string{ d["method"].get_string().value };
+            r.path        = std::string{ d["path"].get_string().value };
+            r.status      = static_cast<int>(d["status"].get_int32().value);
             r.duration_ms = d["duration_ms"].get_double();
-            r.client_ip = std::string{ d["client_ip"].get_string().value };
-            r.user_id = std::string{ d["user_id"].get_string().value };
+            r.client_ip   = std::string{ d["client_ip"].get_string().value };
+            r.user_id     = std::string{ d["user_id"].get_string().value };
             out.push_back(std::move(r));
         }
         return out;
@@ -113,10 +115,10 @@ class MongoStore : public IStore
     std::vector<std::string> get_clients() const override
     {
         std::vector<std::string> out;
-        auto                      coll = db_["events"];
+        auto                     coll = db_["events"];
         // naive: iterate events and collect distinct user_id
         std::unordered_set<std::string> seen;
-        auto cursor = coll.find({});
+        auto                            cursor = coll.find({});
         for (auto&& d : cursor)
         {
             const auto uid = std::string{ d["user_id"].get_string().value };
