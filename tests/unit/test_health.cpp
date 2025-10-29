@@ -36,6 +36,8 @@ class HealthServer
     HealthServer(HealthServer&&)                 = delete;
     HealthServer& operator=(HealthServer&&)      = delete;
 
+    int get_port() const { return port; }
+
   private:
     InMemoryStore   store;
     httplib::Server svr;
@@ -48,7 +50,7 @@ TEST(CharizardAPI, HealthEndpoint)
 {
     HealthServer const server;
 
-    httplib::Client cli("127.0.0.1", server.port);
+    httplib::Client cli("127.0.0.1", server.get_port());
     auto            res = cli.Get("/health");
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 200);
