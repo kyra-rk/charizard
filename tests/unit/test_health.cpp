@@ -39,7 +39,7 @@ class HealthServer
 // TO-DO: place unit tests in unit/ directory
 TEST(CharizardAPI, HealthEndpoint)
 {
-    HealthServer server;
+    HealthServer const server;
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Get("/health");

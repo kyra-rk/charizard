@@ -6,8 +6,8 @@
 #include <vector>
 
 // Allowed transit modes (kept local to this translation unit)
-static const std::vector<std::string> k_allowed_transit_mxodes = { "taxi",  "car",  "bus", "subway",
-                                                               "train", "bike", "walk" };
+static const std::vector<std::string> k_allowed_transit_modes = { "taxi",  "car",  "bus", "subway",
+                                                                  "train", "bike", "walk" };
 
 // Implement the constructor declared in include/storage.hpp.
 // Validates the inputs and fills defaults (eg. timestamp -> now if 0).
@@ -21,8 +21,8 @@ TransitEvent::TransitEvent(const std::string& user_id_, const std::string& mode_
     if (distance_km_ < 0.0)
         throw std::runtime_error("Negative value for distance_km is not allowed.");
 
-    if (std::find(kAllowedTransitModes.begin(), kAllowedTransitModes.end(), mode_) ==
-        kAllowedTransitModes.end())
+    if (std::find(k_allowed_transit_modes.begin(), k_allowed_transit_modes.end(), mode_) ==
+        k_allowed_transit_modes.end())
         throw std::runtime_error("invalid mode");
 
     // fill members

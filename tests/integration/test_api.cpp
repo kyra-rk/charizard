@@ -26,8 +26,8 @@ static httplib::Headers demo_auth_headers()
 static void post_transit(httplib::Client& cli, double distance_km, const std::string& mode,
                          std::int64_t ts /* epoch seconds */)
 {
-    json body = { { "mode", mode }, { "distance_km", distance_km }, { "ts", ts } };
-    auto res  = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
+    json const body = { { "mode", mode }, { "distance_km", distance_km }, { "ts", ts } };
+    auto       res  = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
     ASSERT_TRUE(res != nullptr) << "Transit POST returned null";
     ASSERT_EQ(res->status, 201) << "Transit POST failed, body: " << (res ? res->body : "");
 }
@@ -43,8 +43,8 @@ static void set_admin_key(const char* v)
 
 static httplib::Headers admin_auth_headers()
 {
-    const char* k     = std::getenv("ADMIN_API_KEY");
-    std::string token = k ? k : "";
+    const char*       k     = std::getenv("ADMIN_API_KEY");
+    std::string const token = (k != nullptr) ? k : "";
     return { { "Authorization", "Bearer " + token } };
 }
 
@@ -78,7 +78,7 @@ TEST(ApiHealth, HealthGet)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Get("/health");
@@ -94,8 +94,8 @@ TEST(ApiHealth, HealthGet)
 
 TEST(ApiRegister, Register_InvalidJSON_EmptyBody)
 {
-    InMemoryStore mem;
-    TestServer    server(mem);
+    InMemoryStore    mem;
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Post("/users/register"); // literally no body
@@ -103,14 +103,14 @@ TEST(ApiRegister, Register_InvalidJSON_EmptyBody)
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 400);
 
-    json j = json::parse(res->body);
+    json const j = json::parse(res->body);
     EXPECT_EQ(j.value("error", ""), "invalid_json");
 }
 
 TEST(ApiRegister, Register_InvalidJSON_Garbage)
 {
-    InMemoryStore mem;
-    TestServer    server(mem);
+    InMemoryStore    mem;
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Post("/users/register", "not-json", "application/json");
@@ -118,58 +118,58 @@ TEST(ApiRegister, Register_InvalidJSON_Garbage)
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 400);
 
-    json j = json::parse(res->body);
+    json const j = json::parse(res->body);
     EXPECT_EQ(j.value("error", ""), "invalid_json");
 }
 
 TEST(ApiRegister, Register_MissingAppName_KeyAbsent)
 {
-    InMemoryStore mem;
-    TestServer    server(mem);
+    InMemoryStore    mem;
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
-    json            req = json::object(); // {}
+    json const      req = json::object(); // {}
 
     auto res = cli.Post("/users/register", req.dump(), "application/json");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 400);
 
-    json j = json::parse(res->body);
+    json const j = json::parse(res->body);
     EXPECT_EQ(j.value("error", ""), "missing_app_name");
 }
 
 TEST(ApiRegister, Register_MissingAppName_WrongType)
 {
-    InMemoryStore mem;
-    TestServer    server(mem);
+    InMemoryStore    mem;
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
-    json            req = { { "app_name", 123 } }; // not a string
+    json const      req = { { "app_name", 123 } }; // not a string
 
     auto res = cli.Post("/users/register", req.dump(), "application/json");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 400);
 
-    json j = json::parse(res->body);
+    json const j = json::parse(res->body);
     EXPECT_EQ(j.value("error", ""), "missing_app_name");
 }
 
 // Form-encoded body should fail JSON parse
 TEST(ApiRegister, Register_InvalidJSON_FormEncoded)
 {
-    InMemoryStore mem;
-    TestServer    server(mem);
+    InMemoryStore    mem;
+    TestServer const server(mem);
 
-    httplib::Client  cli("127.0.0.1", server.port);
-    httplib::Headers headers = { { "Content-Type", "application/x-www-form-urlencoded" } };
+    httplib::Client        cli("127.0.0.1", server.port);
+    httplib::Headers const headers = { { "Content-Type", "application/x-www-form-urlencoded" } };
     auto res = cli.Post("/users/register", headers, "app_name=myapp", "application/x-www-form-urlencoded");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 400);
 
-    json j = json::parse(res->body);
+    json const j = json::parse(res->body);
     EXPECT_EQ(j.value("error", ""), "invalid_json");
 }
 
@@ -177,13 +177,13 @@ TEST(ApiRegister, Register_InvalidJSON_FormEncoded)
 
 TEST(ApiRegister, Register_Success_Minimal)
 {
-    InMemoryStore mem;
-    TestServer    server(mem);
+    InMemoryStore    mem;
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
 
     const std::string app_name = "myapp";
-    json              req      = { { "app_name", app_name } };
+    json const        req      = { { "app_name", app_name } };
 
     auto res = cli.Post("/users/register", req.dump(), "application/json");
 
@@ -206,32 +206,32 @@ TEST(ApiRegister, Register_Success_Minimal)
 
     // Format checks: user_id starts with "u_" and has 8 hex chars after → total len 10
     const auto uid = j["user_id"].get<std::string>();
-    ASSERT_GE(uid.size(), 3u);
+    ASSERT_GE(uid.size(), 3U);
     EXPECT_TRUE(uid.rfind("u_", 0) == 0); // prefix
-    EXPECT_EQ(uid.size(), 10u);           // "u_" + 8 hex
+    EXPECT_EQ(uid.size(), 10U);           // "u_" + 8 hex
     EXPECT_TRUE(is_hex(uid.substr(2)));
 
     // api_key is 32 hex chars
     const auto key = j["api_key"].get<std::string>();
-    EXPECT_EQ(key.size(), 32u);
+    EXPECT_EQ(key.size(), 32U);
     EXPECT_TRUE(is_hex(key));
 }
 
 TEST(ApiRegister, Register_Success_IgnoresExtraFields)
 {
-    InMemoryStore mem;
-    TestServer    server(mem);
+    InMemoryStore    mem;
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
 
-    json req = { { "app_name", "widgetizer" }, { "noise", "ignored" }, { "version", 3 } };
+    json const req = { { "app_name", "widgetizer" }, { "noise", "ignored" }, { "version", 3 } };
 
     auto res = cli.Post("/users/register", req.dump(), "application/json");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 201);
 
-    json j = json::parse(res->body);
+    json const j = json::parse(res->body);
     EXPECT_EQ(j.value("app_name", ""), "widgetizer");
     EXPECT_TRUE(j.contains("user_id"));
     EXPECT_TRUE(j.contains("api_key"));
@@ -240,20 +240,20 @@ TEST(ApiRegister, Register_Success_IgnoresExtraFields)
 // Content-Type not JSON but body IS valid JSON → still OK (server just parses req.body)
 TEST(ApiRegister, Register_Success_TextPlainBody)
 {
-    InMemoryStore mem;
-    TestServer    server(mem);
+    InMemoryStore    mem;
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
 
-    json             req     = { { "app_name", "plain" } };
-    httplib::Headers headers = { { "Content-Type", "text/plain" } };
+    json const             req     = { { "app_name", "plain" } };
+    httplib::Headers const headers = { { "Content-Type", "text/plain" } };
 
     auto res = cli.Post("/users/register", headers, req.dump(), "text/plain");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 201);
 
-    json j = json::parse(res->body);
+    json const j = json::parse(res->body);
     EXPECT_EQ(j.value("app_name", ""), "plain");
 }
 
@@ -267,8 +267,8 @@ TEST(ApiTransit, BadPath_NoUserInUrl)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users//transit", demo_auth_headers(), R"({"mode":"bus","distance_km":1})",
                         "application/json");
@@ -281,8 +281,8 @@ TEST(ApiTransit, BadPath_ExtraSegment)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users/demo/transit/extra", demo_auth_headers(), R"({"mode":"bus","distance_km":1})",
                         "application/json");
@@ -297,8 +297,8 @@ TEST(ApiTransit, Unauthorized_NoHeader)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users/demo/transit", R"({"mode":"walk","distance_km":0.5})", "application/json");
 
@@ -311,11 +311,11 @@ TEST(ApiTransit, Unauthorized_WrongKey)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
-    httplib::Headers wrong = { { "X-API-Key", "not-the-key" }, { "Content-Type", "application/json" } };
-    auto             res =
+    httplib::Headers const wrong = { { "X-API-Key", "not-the-key" }, { "Content-Type", "application/json" } };
+    auto                   res =
         cli.Post("/users/demo/transit", wrong, R"({"mode":"walk","distance_km":0.5})", "application/json");
 
     ASSERT_TRUE(res != nullptr);
@@ -328,8 +328,8 @@ TEST(ApiTransit, InvalidJson_EmptyBody)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users/demo/transit", demo_auth_headers(), "", "application/json");
     ASSERT_TRUE(res != nullptr);
@@ -341,8 +341,8 @@ TEST(ApiTransit, InvalidJson_Garbage)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users/demo/transit", demo_auth_headers(), "not-json", "application/json");
     ASSERT_TRUE(res != nullptr);
@@ -354,8 +354,8 @@ TEST(ApiTransit, MissingFields_ModeAbsent)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res =
         cli.Post("/users/demo/transit", demo_auth_headers(), R"({"distance_km": 3.4})", "application/json");
@@ -368,8 +368,8 @@ TEST(ApiTransit, MissingFields_DistanceAbsent)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"bus"})", "application/json");
     ASSERT_TRUE(res != nullptr);
@@ -383,8 +383,8 @@ TEST(ApiTransit, WrongTypes_ModeNotString)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":123,"distance_km":1.0})",
                         "application/json");
@@ -396,8 +396,8 @@ TEST(ApiTransit, WrongTypes_DistanceNotNumber)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"walk","distance_km":"far"})",
                         "application/json");
@@ -411,11 +411,11 @@ TEST(ApiTransit, Success_Minimal_UsesServerTs)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
-    json body = { { "mode", "subway" }, { "distance_km", 7.4 } };
-    auto res  = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
+    json const body = { { "mode", "subway" }, { "distance_km", 7.4 } };
+    auto       res  = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 201);
@@ -426,13 +426,13 @@ TEST(ApiTransit, Success_WithExplicitTs)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
-    json body = { { "mode", "bike" },
-                  { "distance_km", 12.0 },
-                  { "ts", static_cast<std::int64_t>(1730000000) } };
-    auto res  = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
+    json const body = { { "mode", "bike" },
+                        { "distance_km", 12.0 },
+                        { "ts", static_cast<std::int64_t>(1730000000) } };
+    auto       res  = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 201);
@@ -443,8 +443,8 @@ TEST(ApiTransit, Success_IntegerDistanceAccepted)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     // integer literal should parse; get<double>() will coerce fine
     auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"car","distance_km":5})",
@@ -460,12 +460,12 @@ TEST(ApiTransit, Failure_TextPlainWithJsonBody)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
-    httplib::Headers hdrs = { { "X-API-Key", "secret-demo-key" }, { "Content-Type", "text/plain" } };
-    json             body = { { "mode", "tram" }, { "distance_km", 3.1 } };
-    auto             res  = cli.Post("/users/demo/transit", hdrs, body.dump(), "text/plain");
+    httplib::Headers const hdrs = { { "X-API-Key", "secret-demo-key" }, { "Content-Type", "text/plain" } };
+    json const             body = { { "mode", "tram" }, { "distance_km", 3.1 } };
+    auto                   res  = cli.Post("/users/demo/transit", hdrs, body.dump(), "text/plain");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 400);
@@ -476,13 +476,13 @@ TEST(ApiTransit, InvalidJson_FormEncoded)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
-    httplib::Headers hdrs = { { "X-API-Key", "secret-demo-key" },
-                              { "Content-Type", "application/x-www-form-urlencoded" } };
-    auto             res  = cli.Post("/users/demo/transit", hdrs, "mode=bus&distance_km=2.5",
-                                     "application/x-www-form-urlencoded");
+    httplib::Headers const hdrs = { { "X-API-Key", "secret-demo-key" },
+                                    { "Content-Type", "application/x-www-form-urlencoded" } };
+    auto                   res  = cli.Post("/users/demo/transit", hdrs, "mode=bus&distance_km=2.5",
+                                           "application/x-www-form-urlencoded");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 400);
@@ -499,8 +499,8 @@ TEST(ApiFootprint, BadPath_NoUserInUrl)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     // Note: using auth headers even for bad path to isolate routing
     auto res = cli.Get("/users//lifetime-footprint", demo_auth_headers());
@@ -512,8 +512,8 @@ TEST(ApiFootprint, BadPath_ExtraSegment)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Get("/users/demo/lifetime-footprint/extra", demo_auth_headers());
     ASSERT_TRUE(res != nullptr);
@@ -526,8 +526,8 @@ TEST(ApiFootprint, Unauthorized_NoHeader)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Get("/users/demo/lifetime-footprint");
     ASSERT_TRUE(res != nullptr);
@@ -539,11 +539,11 @@ TEST(ApiFootprint, Unauthorized_WrongKey)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
-    httplib::Headers wrong = { { "X-API-Key", "not-the-key" } };
-    auto             res   = cli.Get("/users/demo/lifetime-footprint", wrong);
+    httplib::Headers const wrong = { { "X-API-Key", "not-the-key" } };
+    auto                   res   = cli.Get("/users/demo/lifetime-footprint", wrong);
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 401);
 }
@@ -554,8 +554,8 @@ TEST(ApiFootprint, Success_ZeroWhenNoEvents)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
     ASSERT_TRUE(res != nullptr);
@@ -575,17 +575,17 @@ TEST(ApiFootprint, Success_AccumulatesAndRespectsWindows)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     // Create three events:
     // - 2 days ago: distance 1
     // - 10 days ago: distance 2
     // - 40 days ago: distance 3
     const std::time_t now = std::time(nullptr);
-    post_transit(cli, 1.0, "bus", now - 2 * 24 * 3600);
-    post_transit(cli, 2.0, "bus", now - 10 * 24 * 3600);
-    post_transit(cli, 3.0, "bus", now - 40 * 24 * 3600);
+    post_transit(cli, 1.0, "bus", now - (2 * 24 * 3600));
+    post_transit(cli, 2.0, "bus", now - (10 * 24 * 3600));
+    post_transit(cli, 3.0, "bus", now - (40 * 24 * 3600));
 
     auto res = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
     ASSERT_TRUE(res != nullptr);
@@ -622,14 +622,14 @@ TEST(ApiFootprint, IgnoresOtherUsersEvents)
     // Register demo and another user
     mem.set_api_key("demo", "secret-demo-key");
     mem.set_api_key("u_other", "k_other");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     // Post an event for u_other (should NOT count for demo)
     {
-        json             body = { { "mode", "car" }, { "distance_km", 100.0 } };
-        httplib::Headers hdr  = { { "X-API-Key", "k_other" }, { "Content-Type", "application/json" } };
-        auto             res  = cli.Post("/users/u_other/transit", hdr, body.dump(), "application/json");
+        json const             body = { { "mode", "car" }, { "distance_km", 100.0 } };
+        httplib::Headers const hdr  = { { "X-API-Key", "k_other" }, { "Content-Type", "application/json" } };
+        auto                   res = cli.Post("/users/u_other/transit", hdr, body.dump(), "application/json");
         ASSERT_TRUE(res != nullptr);
         ASSERT_EQ(res->status, 201);
     }
@@ -652,8 +652,8 @@ TEST(ApiTransit, Validation_NegativeDistance)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"walk","distance_km":-3.5})",
                         "application/json");
@@ -666,8 +666,8 @@ TEST(ApiTransit, Validation_InvalidMode)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Post("/users/demo/transit", demo_auth_headers(),
                         R"({"mode":"spaceship","distance_km":1.0})", "application/json");
@@ -681,12 +681,12 @@ TEST(TransitEventUnit, Validation_EmptyUserIdThrows)
 {
     try
     {
-        TransitEvent ev("", "walk", 1.0, 0);
+        TransitEvent const ev("", "walk", 1.0, 0);
         FAIL() << "Expected std::runtime_error to be thrown for empty user_id";
     }
     catch (const std::runtime_error& e)
     {
-        std::string msg(e.what());
+        std::string const msg(e.what());
         EXPECT_NE(msg.find("user_id must not be empty"), std::string::npos);
     }
     catch (...)
@@ -703,7 +703,7 @@ TEST(ApiSuggestions, BadPath_NoUserInUrl)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Get("/users//suggestions", demo_auth_headers());
@@ -716,7 +716,7 @@ TEST(ApiSuggestions, BadPath_ExtraSegment)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Get("/users/demo/suggestions/extra", demo_auth_headers());
@@ -731,7 +731,7 @@ TEST(ApiSuggestions, Unauthorized_NoHeader)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key"); // register user for realism
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Get("/users/demo/suggestions"); // no X-API-Key
@@ -745,11 +745,11 @@ TEST(ApiSuggestions, Unauthorized_WrongKey)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
-    httplib::Client  cli("127.0.0.1", server.port);
-    httplib::Headers wrong = { { "X-API-Key", "not-the-key" } };
-    auto             res   = cli.Get("/users/demo/suggestions", wrong);
+    httplib::Client        cli("127.0.0.1", server.port);
+    httplib::Headers const wrong = { { "X-API-Key", "not-the-key" } };
+    auto                   res   = cli.Get("/users/demo/suggestions", wrong);
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 401);
@@ -761,7 +761,7 @@ TEST(ApiSuggestions, Success_LowEmissions_NoEvents)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     // No events posted --> expect "Nice work!" branch
     httplib::Client cli("127.0.0.1", server.port);
@@ -784,7 +784,7 @@ TEST(ApiSuggestions, Success_HighEmissions_AboveThresholdThisWeek)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
 
@@ -802,7 +802,7 @@ TEST(ApiSuggestions, Success_HighEmissions_AboveThresholdThisWeek)
     ASSERT_TRUE(j["suggestions"].is_array());
 
     const auto& arr = j["suggestions"];
-    ASSERT_EQ(arr.size(), 2u);
+    ASSERT_EQ(arr.size(), 2U);
     EXPECT_EQ(arr[0].get<std::string>(), "Try switching short taxi rides to subway or bus.");
     EXPECT_EQ(arr[1].get<std::string>(), "Batch trips to reduce total distance.");
 }
@@ -814,17 +814,17 @@ TEST(ApiSuggestions, IgnoresOtherUsersWeeklyEmissions)
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
     mem.set_api_key("u_other", "k_other");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
 
     // Post a huge event for u_other this week (should not affect demo)
     {
-        json             body     = { { "mode", "car" },
-                                      { "distance_km", 10000.0 },
-                                      { "ts", static_cast<std::int64_t>(std::time(nullptr)) } };
-        httplib::Headers hdr      = { { "X-API-Key", "k_other" }, { "Content-Type", "application/json" } };
-        auto             res_post = cli.Post("/users/u_other/transit", hdr, body.dump(), "application/json");
+        json const             body = { { "mode", "car" },
+                                        { "distance_km", 10000.0 },
+                                        { "ts", static_cast<std::int64_t>(std::time(nullptr)) } };
+        httplib::Headers const hdr  = { { "X-API-Key", "k_other" }, { "Content-Type", "application/json" } };
+        auto res_post = cli.Post("/users/u_other/transit", hdr, body.dump(), "application/json");
         ASSERT_TRUE(res_post != nullptr);
         ASSERT_EQ(res_post->status, 201);
     }
@@ -837,7 +837,7 @@ TEST(ApiSuggestions, IgnoresOtherUsersWeeklyEmissions)
     auto j = json::parse(res->body);
     EXPECT_EQ(j.value("user_id", ""), "demo");
     ASSERT_TRUE(j["suggestions"].is_array());
-    ASSERT_EQ(j["suggestions"].size(), 1u);
+    ASSERT_EQ(j["suggestions"].size(), 1U);
     EXPECT_EQ(j["suggestions"][0].get<std::string>(),
               "Nice work! Consider biking or walking for short hops.");
 }
@@ -852,7 +852,7 @@ TEST(ApiAnalytics, BadPath_NoUserInUrl)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Get("/users//analytics", demo_auth_headers());
@@ -864,7 +864,7 @@ TEST(ApiAnalytics, BadPath_ExtraSegment)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Get("/users/demo/analytics/extra", demo_auth_headers());
@@ -878,7 +878,7 @@ TEST(ApiAnalytics, Unauthorized_NoHeader)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Get("/users/demo/analytics"); // no X-API-Key
@@ -891,11 +891,11 @@ TEST(ApiAnalytics, Unauthorized_WrongKey)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
-    httplib::Client  cli("127.0.0.1", server.port);
-    httplib::Headers wrong = { { "X-API-Key", "not-the-key" } };
-    auto             res   = cli.Get("/users/demo/analytics", wrong);
+    httplib::Client        cli("127.0.0.1", server.port);
+    httplib::Headers const wrong = { { "X-API-Key", "not-the-key" } };
+    auto                   res   = cli.Get("/users/demo/analytics", wrong);
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 401);
 }
@@ -907,7 +907,7 @@ TEST(ApiAnalytics, Success_NoEvents_AllZero)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
     httplib::Client cli("127.0.0.1", server.port);
     auto            res = cli.Get("/users/demo/analytics", demo_auth_headers());
@@ -926,8 +926,8 @@ TEST(ApiAnalytics, Success_OnlyDemoHasEvents_PeerAvgEqualsUser)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     const std::time_t now = std::time(nullptr);
 
@@ -938,9 +938,9 @@ TEST(ApiAnalytics, Success_OnlyDemoHasEvents_PeerAvgEqualsUser)
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 200);
 
-    auto   j = json::parse(res->body);
-    double u = j.value("this_week_kg_co2", -1.0);
-    double p = j.value("peer_week_avg_kg_co2", -1.0);
+    auto         j = json::parse(res->body);
+    double const u = j.value("this_week_kg_co2", -1.0);
+    double const p = j.value("peer_week_avg_kg_co2", -1.0);
 
     ASSERT_GE(u, 0.0);
     ASSERT_GE(p, 0.0);
@@ -957,21 +957,25 @@ TEST(ApiAnalytics, Success_PeersOnly_DemoZeroAboveFalse)
     mem.set_api_key("demo", "secret-demo-key");
     mem.set_api_key("u1", "k1");
     mem.set_api_key("u2", "k2");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     const std::time_t now = std::time(nullptr);
     // Post weekly events for two peers
     {
-        json b1 = { { "mode", "bus" }, { "distance_km", 20.0 }, { "ts", static_cast<std::int64_t>(now) } };
-        httplib::Headers h1 = { { "X-API-Key", "k1" }, { "Content-Type", "application/json" } };
-        auto             r1 = cli.Post("/users/u1/transit", h1, b1.dump(), "application/json");
+        json const             b1 = { { "mode", "bus" },
+                                      { "distance_km", 20.0 },
+                                      { "ts", static_cast<std::int64_t>(now) } };
+        httplib::Headers const h1 = { { "X-API-Key", "k1" }, { "Content-Type", "application/json" } };
+        auto                   r1 = cli.Post("/users/u1/transit", h1, b1.dump(), "application/json");
         ASSERT_TRUE(r1 != nullptr);
         ASSERT_EQ(r1->status, 201);
 
-        json b2 = { { "mode", "bus" }, { "distance_km", 40.0 }, { "ts", static_cast<std::int64_t>(now) } };
-        httplib::Headers h2 = { { "X-API-Key", "k2" }, { "Content-Type", "application/json" } };
-        auto             r2 = cli.Post("/users/u2/transit", h2, b2.dump(), "application/json");
+        json const             b2 = { { "mode", "bus" },
+                                      { "distance_km", 40.0 },
+                                      { "ts", static_cast<std::int64_t>(now) } };
+        httplib::Headers const h2 = { { "X-API-Key", "k2" }, { "Content-Type", "application/json" } };
+        auto                   r2 = cli.Post("/users/u2/transit", h2, b2.dump(), "application/json");
         ASSERT_TRUE(r2 != nullptr);
         ASSERT_EQ(r2->status, 201);
     }
@@ -995,21 +999,25 @@ TEST(ApiAnalytics, Success_AbovePeerAvg_WhenHigherThanPeers)
     mem.set_api_key("demo", "secret-demo-key");
     mem.set_api_key("u1", "k1");
     mem.set_api_key("u2", "k2");
-    TestServer        server(mem);
+    TestServer const  server(mem);
     httplib::Client   cli("127.0.0.1", server.port);
     const std::time_t now = std::time(nullptr);
 
     // Peers each at 100 km, demo at 200 km
     {
-        json b1 = { { "mode", "bus" }, { "distance_km", 100.0 }, { "ts", static_cast<std::int64_t>(now) } };
-        httplib::Headers h1 = { { "X-API-Key", "k1" }, { "Content-Type", "application/json" } };
-        auto             r1 = cli.Post("/users/u1/transit", h1, b1.dump(), "application/json");
+        json const             b1 = { { "mode", "bus" },
+                                      { "distance_km", 100.0 },
+                                      { "ts", static_cast<std::int64_t>(now) } };
+        httplib::Headers const h1 = { { "X-API-Key", "k1" }, { "Content-Type", "application/json" } };
+        auto                   r1 = cli.Post("/users/u1/transit", h1, b1.dump(), "application/json");
         ASSERT_TRUE(r1 != nullptr);
         ASSERT_EQ(r1->status, 201);
 
-        json b2 = { { "mode", "bus" }, { "distance_km", 100.0 }, { "ts", static_cast<std::int64_t>(now) } };
-        httplib::Headers h2 = { { "X-API-Key", "k2" }, { "Content-Type", "application/json" } };
-        auto             r2 = cli.Post("/users/u2/transit", h2, b2.dump(), "application/json");
+        json const             b2 = { { "mode", "bus" },
+                                      { "distance_km", 100.0 },
+                                      { "ts", static_cast<std::int64_t>(now) } };
+        httplib::Headers const h2 = { { "X-API-Key", "k2" }, { "Content-Type", "application/json" } };
+        auto                   r2 = cli.Post("/users/u2/transit", h2, b2.dump(), "application/json");
         ASSERT_TRUE(r2 != nullptr);
         ASSERT_EQ(r2->status, 201);
 
@@ -1020,9 +1028,9 @@ TEST(ApiAnalytics, Success_AbovePeerAvg_WhenHigherThanPeers)
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 200);
 
-    auto   j = json::parse(res->body);
-    double u = j.value("this_week_kg_co2", -1.0);
-    double p = j.value("peer_week_avg_kg_co2", -1.0);
+    auto         j = json::parse(res->body);
+    double const u = j.value("this_week_kg_co2", -1.0);
+    double const p = j.value("peer_week_avg_kg_co2", -1.0);
 
     ASSERT_GT(u, 0.0);
     ASSERT_GT(p, 0.0);
@@ -1038,7 +1046,7 @@ TEST(ApiAnalytics, Success_EqualToPeerAvg_WhenAllEqual)
     mem.set_api_key("demo", "secret-demo-key");
     mem.set_api_key("u1", "k1");
     mem.set_api_key("u2", "k2");
-    TestServer        server(mem);
+    TestServer const  server(mem);
     httplib::Client   cli("127.0.0.1", server.port);
     const std::time_t now = std::time(nullptr);
 
@@ -1046,15 +1054,19 @@ TEST(ApiAnalytics, Success_EqualToPeerAvg_WhenAllEqual)
     {
         post_transit(cli, 50.0, "bus", static_cast<std::int64_t>(now)); // demo
 
-        json b1 = { { "mode", "bus" }, { "distance_km", 50.0 }, { "ts", static_cast<std::int64_t>(now) } };
-        httplib::Headers h1 = { { "X-API-Key", "k1" }, { "Content-Type", "application/json" } };
-        auto             r1 = cli.Post("/users/u1/transit", h1, b1.dump(), "application/json");
+        json const             b1 = { { "mode", "bus" },
+                                      { "distance_km", 50.0 },
+                                      { "ts", static_cast<std::int64_t>(now) } };
+        httplib::Headers const h1 = { { "X-API-Key", "k1" }, { "Content-Type", "application/json" } };
+        auto                   r1 = cli.Post("/users/u1/transit", h1, b1.dump(), "application/json");
         ASSERT_TRUE(r1 != nullptr);
         ASSERT_EQ(r1->status, 201);
 
-        json b2 = { { "mode", "bus" }, { "distance_km", 50.0 }, { "ts", static_cast<std::int64_t>(now) } };
-        httplib::Headers h2 = { { "X-API-Key", "k2" }, { "Content-Type", "application/json" } };
-        auto             r2 = cli.Post("/users/u2/transit", h2, b2.dump(), "application/json");
+        json const             b2 = { { "mode", "bus" },
+                                      { "distance_km", 50.0 },
+                                      { "ts", static_cast<std::int64_t>(now) } };
+        httplib::Headers const h2 = { { "X-API-Key", "k2" }, { "Content-Type", "application/json" } };
+        auto                   r2 = cli.Post("/users/u2/transit", h2, b2.dump(), "application/json");
         ASSERT_TRUE(r2 != nullptr);
         ASSERT_EQ(r2->status, 201);
     }
@@ -1063,9 +1075,9 @@ TEST(ApiAnalytics, Success_EqualToPeerAvg_WhenAllEqual)
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 200);
 
-    auto   j = json::parse(res->body);
-    double u = j.value("this_week_kg_co2", -1.0);
-    double p = j.value("peer_week_avg_kg_co2", -1.0);
+    auto         j = json::parse(res->body);
+    double const u = j.value("this_week_kg_co2", -1.0);
+    double const p = j.value("peer_week_avg_kg_co2", -1.0);
 
     EXPECT_NEAR(u, p, 1e-9);
     EXPECT_FALSE(j.value("above_peer_avg", true));
@@ -1079,20 +1091,20 @@ TEST(ApiAnalytics, Success_IgnoresEventsOlderThan7Days)
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
     mem.set_api_key("u_old", "k_old");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     const std::time_t now            = std::time(nullptr);
-    const std::time_t eight_days_ago = now - 8 * 24 * 3600;
+    const std::time_t eight_days_ago = now - (8 * 24 * 3600);
 
     // Post an old event for demo and another user; both should be ignored
     post_transit(cli, /*distance_km=*/500.0, "bus", static_cast<std::int64_t>(eight_days_ago));
 
-    json             b = { { "mode", "bus" },
-                           { "distance_km", 500.0 },
-                           { "ts", static_cast<std::int64_t>(eight_days_ago) } };
-    httplib::Headers h = { { "X-API-Key", "k_old" }, { "Content-Type", "application/json" } };
-    auto             r = cli.Post("/users/u_old/transit", h, b.dump(), "application/json");
+    json const             b = { { "mode", "bus" },
+                                 { "distance_km", 500.0 },
+                                 { "ts", static_cast<std::int64_t>(eight_days_ago) } };
+    httplib::Headers const h = { { "X-API-Key", "k_old" }, { "Content-Type", "application/json" } };
+    auto                   r = cli.Post("/users/u_old/transit", h, b.dump(), "application/json");
     ASSERT_TRUE(r != nullptr);
     ASSERT_EQ(r->status, 201);
 
@@ -1114,9 +1126,9 @@ TEST(ApiAnalytics, Success_IgnoresEventsOlderThan7Days)
 TEST(AdminAuth, Unauthorized_NoHeader)
 {
     set_admin_key("super-secret");
-    InMemoryStore   mem;
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Get("/admin/clients"); // no Authorization
     ASSERT_TRUE(res != nullptr);
@@ -1127,12 +1139,12 @@ TEST(AdminAuth, Unauthorized_NoHeader)
 TEST(AdminAuth, Unauthorized_WrongBearer)
 {
     set_admin_key("super-secret");
-    InMemoryStore   mem;
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
-    httplib::Headers bad = { { "Authorization", "Bearer not-it" } };
-    auto             res = cli.Get("/admin/clients", bad);
+    httplib::Headers const bad = { { "Authorization", "Bearer not-it" } };
+    auto                   res = cli.Get("/admin/clients", bad);
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 401);
 }
@@ -1147,8 +1159,8 @@ TEST(AdminLogs, Logs_AppearAfterValidRequests_ThenCanBeCleared)
     set_admin_key("super-secret");
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     // Make a couple of valid, loggable requests
     {
@@ -1158,8 +1170,8 @@ TEST(AdminLogs, Logs_AppearAfterValidRequests_ThenCanBeCleared)
         ASSERT_EQ(r1->status, 200);
 
         // 2) Transit post (POST)
-        json body = { { "mode", "bus" }, { "distance_km", 1.2 } };
-        auto r2   = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
+        json const body = { { "mode", "bus" }, { "distance_km", 1.2 } };
+        auto       r2 = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
         ASSERT_TRUE(r2 != nullptr);
         ASSERT_EQ(r2->status, 201);
     }
@@ -1170,17 +1182,18 @@ TEST(AdminLogs, Logs_AppearAfterValidRequests_ThenCanBeCleared)
     ASSERT_EQ(res->status, 200);
     auto arr = json::parse(res->body);
     ASSERT_TRUE(arr.is_array());
-    ASSERT_GE(arr.size(), 2u);
+    ASSERT_GE(arr.size(), 2U);
 
     // Spot-check a couple of fields on the latest log entries
-    bool saw_transit = false, saw_lifetime = false;
+    bool saw_transit  = false;
+    bool saw_lifetime = false;
     for (const auto& item : arr)
     {
         if (!item.is_object())
             continue;
-        std::string path = item.value("path", "");
-        std::string meth = item.value("method", "");
-        int         code = item.value("status", -1);
+        std::string const path = item.value("path", "");
+        std::string const meth = item.value("method", "");
+        int const         code = item.value("status", -1);
         if (path == "/users/demo/transit" && meth == "POST" && code == 201)
             saw_transit = true;
         if (path == "/users/demo/lifetime-footprint" && meth == "GET" && code == 200)
@@ -1201,7 +1214,7 @@ TEST(AdminLogs, Logs_AppearAfterValidRequests_ThenCanBeCleared)
     ASSERT_EQ(res2->status, 200);
     auto arr2 = json::parse(res2->body);
     ASSERT_TRUE(arr2.is_array());
-    EXPECT_EQ(arr2.size(), 0u);
+    EXPECT_EQ(arr2.size(), 0U);
 }
 
 /* =================================================== */
@@ -1214,8 +1227,8 @@ TEST(AdminClients, Clients_EmptyUntilTransitEventsExist)
     set_admin_key("super-secret");
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     // No events yet --> expect empty list
     auto res0 = cli.Get("/admin/clients", admin_auth_headers());
@@ -1223,7 +1236,7 @@ TEST(AdminClients, Clients_EmptyUntilTransitEventsExist)
     ASSERT_EQ(res0->status, 200);
     auto list0 = json::parse(res0->body);
     ASSERT_TRUE(list0.is_array());
-    EXPECT_EQ(list0.size(), 0u);
+    EXPECT_EQ(list0.size(), 0U);
 
     // Create a transit event for 'demo'
     const std::time_t now = std::time(nullptr);
@@ -1235,7 +1248,7 @@ TEST(AdminClients, Clients_EmptyUntilTransitEventsExist)
     ASSERT_EQ(res1->status, 200);
     auto list1 = json::parse(res1->body);
     ASSERT_TRUE(list1.is_array());
-    ASSERT_GE(list1.size(), 1u);
+    ASSERT_GE(list1.size(), 1U);
     bool has_demo = false;
     for (const auto& v : list1)
         if (v.is_string() && v.get<std::string>() == "demo")
@@ -1248,10 +1261,10 @@ TEST(AdminClients, ClientData_ReturnsUserTransitEvents)
     set_admin_key("super-secret");
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
-    const std::int64_t t1 = static_cast<std::int64_t>(std::time(nullptr));
+    const auto         t1 = static_cast<std::int64_t>(std::time(nullptr));
     const std::int64_t t2 = t1 + 5;
 
     // Two events for demo
@@ -1264,18 +1277,18 @@ TEST(AdminClients, ClientData_ReturnsUserTransitEvents)
     ASSERT_EQ(res->status, 200);
     auto arr = json::parse(res->body);
     ASSERT_TRUE(arr.is_array());
-    ASSERT_EQ(arr.size(), 2u);
+    ASSERT_EQ(arr.size(), 2U);
 
     // Order is not guaranteed; verify both objects are present
-    bool saw_car = false;
+    bool saw_car  = false;
     bool saw_bike = false;
     for (const auto& e : arr)
     {
         if (!e.is_object())
             continue;
-        std::string  mode = e.value("mode", "");
-        double       dist = e.value("distance_km", -1.0);
-        std::int64_t ts   = e.value("ts", static_cast<std::int64_t>(-1));
+        std::string const  mode = e.value("mode", "");
+        double const       dist = e.value("distance_km", -1.0);
+        std::int64_t const ts   = e.value("ts", static_cast<std::int64_t>(-1));
         if (mode == "car" && dist == 100.0 && ts == t1)
             saw_car = true;
         if (mode == "bike" && dist == 100.0 && ts == t2)
@@ -1290,15 +1303,15 @@ TEST(AdminClients, ClientData_UnknownUser_ReturnsEmptyArray)
     set_admin_key("super-secret");
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     auto res = cli.Get("/admin/clients/nope/data", admin_auth_headers());
     ASSERT_TRUE(res != nullptr);
     ASSERT_EQ(res->status, 200);
     auto arr = json::parse(res->body);
     ASSERT_TRUE(arr.is_array());
-    EXPECT_EQ(arr.size(), 0u);
+    EXPECT_EQ(arr.size(), 0U);
 }
 
 /* =================================================== */
@@ -1310,8 +1323,8 @@ TEST(AdminDb, ClearDbEvents_RemovesOnlyEvents_AfterwardsClientsEmpty)
     set_admin_key("super-secret");
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     // Seed some events
     post_transit(cli, 5.0, "bus", static_cast<std::int64_t>(std::time(nullptr)));
@@ -1322,7 +1335,7 @@ TEST(AdminDb, ClearDbEvents_RemovesOnlyEvents_AfterwardsClientsEmpty)
     ASSERT_EQ(before->status, 200);
     auto list_before = json::parse(before->body);
     ASSERT_TRUE(list_before.is_array());
-    ASSERT_GE(list_before.size(), 1u);
+    ASSERT_GE(list_before.size(), 1U);
 
     // Clear just events
     auto clr = cli.Get("/admin/clear-db-events", admin_auth_headers());
@@ -1336,7 +1349,7 @@ TEST(AdminDb, ClearDbEvents_RemovesOnlyEvents_AfterwardsClientsEmpty)
     ASSERT_EQ(after->status, 200);
     auto list_after = json::parse(after->body);
     ASSERT_TRUE(list_after.is_array());
-    EXPECT_EQ(list_after.size(), 0u);
+    EXPECT_EQ(list_after.size(), 0U);
 }
 
 TEST(AdminDb, ClearDb_RemovesEverything_ClientsEmpty)
@@ -1344,8 +1357,8 @@ TEST(AdminDb, ClearDb_RemovesEverything_ClientsEmpty)
     set_admin_key("super-secret");
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
 
     // Seed some events and make at least one other request to generate logs
     post_transit(cli, 3.0, "walk", static_cast<std::int64_t>(std::time(nullptr)));
@@ -1365,7 +1378,7 @@ TEST(AdminDb, ClearDb_RemovesEverything_ClientsEmpty)
     ASSERT_EQ(clients->status, 200);
     auto list = json::parse(clients->body);
     ASSERT_TRUE(list.is_array());
-    EXPECT_EQ(list.size(), 0u);
+    EXPECT_EQ(list.size(), 0U);
 
     // Logs empty
     auto logs = cli.Get("/admin/logs", admin_auth_headers());
@@ -1373,5 +1386,5 @@ TEST(AdminDb, ClearDb_RemovesEverything_ClientsEmpty)
     ASSERT_EQ(logs->status, 200);
     auto arr = json::parse(logs->body);
     ASSERT_TRUE(arr.is_array());
-    EXPECT_EQ(arr.size(), 0u);
+    EXPECT_EQ(arr.size(), 0U);
 }

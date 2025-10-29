@@ -27,11 +27,11 @@ int main()
     httplib::Server svr;
     configure_routes(svr, *store);
 
-    const char* env_port  = std::getenv("PORT");
-    int         port      = env_port ? std::atoi(env_port) : 8080;
-    const char* host      = std::getenv("HOST");
-    std::string bind_host = host ? host : "0.0.0.0";
+    const char*       env_port  = std::getenv("PORT");
+    int const         port      = (env_port != nullptr) ? std::atoi(env_port) : 8080;
+    const char*       host      = std::getenv("HOST");
+    std::string const bind_host = (host != nullptr) ? host : "0.0.0.0";
 
-    std::cout << "[charizard] listening on " << bind_host << ":" << port << std::endl;
-    svr.listen(bind_host.c_str(), port);
+    std::cout << "[charizard] listening on " << bind_host << ":" << port << '\n';
+    svr.listen(bind_host, port);
 }

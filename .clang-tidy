@@ -12,7 +12,10 @@ Checks: >
   -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
   -readability-magic-numbers,
   -readability-identifier-length,
-  -modernize-use-trailing-return-type
+  -modernize-use-trailing-return-type,
+  -modernize-use-scoped-lock,
+  -readability-braces-around-statements,
+  -misc-include-cleaner
 
 WarningsAsErrors: 'bugprone-*,performance-*,portability-*,readability-*,modernize-*,clang-analyzer-*'
 

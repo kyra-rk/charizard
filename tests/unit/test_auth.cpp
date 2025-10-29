@@ -36,7 +36,7 @@ TEST(AuthHeaders, MissingHeaderFails)
 {
     InMemoryStore s;
     s.set_api_key("demo", "secret-demo-key");
-    httplib::Request req;
+    httplib::Request const req;
     // no headers set
     EXPECT_FALSE(test_check_auth(s, req, "demo"));
 }
