@@ -8,6 +8,7 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 #include <thread>
+#include <tuple>
 
 using nlohmann::json;
 
@@ -80,12 +81,34 @@ TEST(ApiHealth, HealthGet)
     mem.set_api_key("demo", "secret-demo-key");
     TestServer server(mem);
 
-    httplib::Client cli("127.0.0.1", server.port);
-    auto            res = cli.Get("/health");
+    const httplib::Client cli("127.0.0.1", server.port);
+    const auto            res = cli.Get("/health");
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 200);
-    auto j = json::parse(res->body);
+    const auto j = json::parse(res->body);
     EXPECT_TRUE(j["ok"].get<bool>());
+}
+
+// Test helper: create a server, post two events for 'demo', and return the parsed array + timestamps
+static std::tuple<json, std::int64_t, std::int64_t> setup_demo_with_two_events()
+{
+    set_admin_key("super-secret");
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer      server(mem);
+    httplib::Client cli("127.0.0.1", server.port);
+
+    const auto t1 = static_cast<std::int64_t>(std::time(nullptr));
+    const auto t2 = t1 + 5;
+
+    post_transit(cli, 100.0, "car", t1);
+    post_transit(cli, 100.0, "bike", t2);
+
+    auto res = cli.Get("/admin/clients/demo/data", admin_auth_headers());
+    if (!res)
+        return { json::array(), t1, t2 };
+    auto arr = json::parse(res->body);
+    return { arr, t1, t2 };
 }
 
 /* =================================================== */
@@ -1244,30 +1267,17 @@ TEST(AdminClients, Clients_EmptyUntilTransitEventsExist)
     EXPECT_TRUE(has_demo);
 }
 
-TEST(AdminClients, ClientData_ReturnsUserTransitEvents)
+TEST(AdminClients, ClientData_ReturnsUserTransitEvents_Count)
 {
-    set_admin_key("super-secret");
-    InMemoryStore mem;
-    mem.set_api_key("demo", "secret-demo-key");
-    TestServer      server(mem);
-    httplib::Client cli("127.0.0.1", server.port);
-
-    const std::int64_t t1 = static_cast<std::int64_t>(std::time(nullptr));
-    const std::int64_t t2 = t1 + 5;
-
-    // Two events for demo
-    post_transit(cli, 100.0, "car", t1);
-    post_transit(cli, 100.0, "bike", t2);
-
-    // Fetch per-user data
-    auto res = cli.Get("/admin/clients/demo/data", admin_auth_headers());
-    ASSERT_TRUE(res != nullptr);
-    ASSERT_EQ(res->status, 200);
-    auto arr = json::parse(res->body);
+    auto [arr, t1, t2] = setup_demo_with_two_events();
     ASSERT_TRUE(arr.is_array());
     ASSERT_EQ(arr.size(), 2U);
+}
 
-    // Order is not guaranteed; verify both objects are present
+TEST(AdminClients, ClientData_ReturnsUserTransitEvents_Content)
+{
+    auto [arr, t1, t2] = setup_demo_with_two_events();
+
     bool saw_car  = false;
     bool saw_bike = false;
     for (const auto& e : arr)
