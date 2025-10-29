@@ -108,8 +108,6 @@ target_include_directories(charizard_unit_tests PRIVATE
 )
 target_link_libraries(charizard_unit_tests PRIVATE gtest_main nlohmann_json::nlohmann_json)
 
-add_test(NAME unit COMMAND charizard_unit_tests)
-
 # Integration (HTTP) test target
 add_executable(charizard_api_tests
   tests/integration/test_api.cpp
@@ -122,9 +120,15 @@ target_include_directories(charizard_api_tests PRIVATE
 )
 target_link_libraries(charizard_api_tests PRIVATE gtest_main nlohmann_json::nlohmann_json)
 
-add_test(NAME api COMMAND charizard_api_tests)
-
 # ---- TEST COVERAGE ----
+include(GoogleTest)
+gtest_discover_tests(charizard_unit_tests
+  DISCOVERY_MODE PRE_TEST
+)
+gtest_discover_tests(charizard_api_tests
+  DISCOVERY_MODE PRE_TEST
+)
+
 if (CHARIZARD_ENABLE_COVERAGE)
   message(STATUS "Building with coverage instrumentation enabled")
   enable_coverage_for(charizard_api_obj)
