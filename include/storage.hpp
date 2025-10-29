@@ -17,7 +17,8 @@ struct TransitEvent
     // Default and validating constructor. Implemented in src/transit_validator.cpp
     TransitEvent() = default;
     TransitEvent(const std::string& user_id_, const std::string& mode_, double distance_km_,
-                 std::int64_t ts_ = 0);
+                 std::int64_t ts_ = 0) // NOLINT(bugprone-easily-swappable-parameters)
+        ;
 };
 
 struct ApiLogRecord
@@ -190,8 +191,8 @@ class InMemoryStore : public IStore
         if (it == events_.end())
             return s;
 
-        auto week_start  = now - 7 * 24 * 3600;
-        auto month_start = now - 30 * 24 * 3600;
+        auto week_start  = now - (7 * 24 * 3600);
+        auto month_start = now - (30 * 24 * 3600);
 
         for (const auto& ev : it->second)
         {
@@ -216,7 +217,7 @@ class InMemoryStore : public IStore
         std::scoped_lock lk(mu_);
         std::size_t      users_with_data = 0;
         double           total           = 0.0;
-        auto             week_start      = now - 7 * 24 * 3600;
+        auto             week_start      = now - (7 * 24 * 3600);
 
         for (auto& [user, vec] : events_)
         {

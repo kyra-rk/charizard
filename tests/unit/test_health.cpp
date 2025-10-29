@@ -10,7 +10,6 @@
 
 using nlohmann::json;
 
-// Helper to start/stop the server for the test
 class HealthServer
 {
   public:

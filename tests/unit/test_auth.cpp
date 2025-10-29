@@ -67,3 +67,4 @@ TEST(AuthHeaders, CorrectKeySucceeds)
     req.headers.insert({ "X-API-Key", "secret-demo-key" });
     EXPECT_TRUE(test_check_auth(s, req, "demo"));
 }
+
