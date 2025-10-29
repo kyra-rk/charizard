@@ -79,15 +79,16 @@ TEST(ApiHealth, HealthGet)
 {
     InMemoryStore mem;
     mem.set_api_key("demo", "secret-demo-key");
-    TestServer server(mem);
+    TestServer const server(mem);
 
-    const httplib::Client cli("127.0.0.1", server.port);
-    const auto            res = cli.Get("/health");
+    httplib::Client cli("127.0.0.1", server.port);
+    auto            res = cli.Get("/health");
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 200);
-    const auto j = json::parse(res->body);
+    auto j = json::parse(res->body);
     EXPECT_TRUE(j["ok"].get<bool>());
 }
+
 
 // Test helper: create a server, post two events for 'demo', and return the parsed array + timestamps
 static std::tuple<json, std::int64_t, std::int64_t> setup_demo_with_two_events()
