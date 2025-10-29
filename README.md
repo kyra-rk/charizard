@@ -253,3 +253,9 @@ To run a coverage report on your tests, run
     $ make build-cov
     $ make coverage
     $ make cov-open
+
+As of the last time this codebase was modified, the coverage is as follows:
+![Function (100%), Line (98.11%), Region (91.63%), Branch (79.23%)](assets/img/coverage.png "Coverage")
+
+----
+*Last updated October 29, 2025*
