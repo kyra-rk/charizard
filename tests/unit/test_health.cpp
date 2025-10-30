@@ -17,17 +17,17 @@ class HealthServer
     HealthServer()
     {
         // Use the member `store` so the routes capture a reference that stays alive
-        configure_routes(svr, store);
+        configure_routes(svr_, store_);
         // run server on a background thread
-        thread = std::thread([this] { svr.listen("127.0.0.1", port); });
+        thread_ = std::thread([this] { svr_.listen("127.0.0.1", port_); });
         std::this_thread::sleep_for(std::chrono::milliseconds(200)); // give server time to start
     }
 
     ~HealthServer()
     {
-        svr.stop();
-        if (thread.joinable())
-            thread.join();
+        svr_.stop();
+        if (thread_.joinable())
+            thread_.join();
     }
 
     // Rule-of-five clarity
@@ -36,13 +36,16 @@ class HealthServer
     HealthServer(HealthServer&&)                 = delete;
     HealthServer& operator=(HealthServer&&)      = delete;
 
-    int get_port() const { return port; }
+    int get_port() const
+    {
+        return port_;
+    }
 
   private:
-    InMemoryStore   store;
-    httplib::Server svr;
-    std::thread     thread;
-    int             port = 18080;
+    InMemoryStore   store_;
+    httplib::Server svr_;
+    std::thread     thread_;
+    int             port_ = 18080;
 };
 
 // TO-DO: place unit tests in unit/ directory

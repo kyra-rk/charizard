@@ -10,17 +10,20 @@
 
 using nlohmann::json;
 
+// NOLINTNEXTLINE(misc-use-anonymous-namespace)
 static std::int64_t now_epoch()
 {
     return std::time(nullptr);
 }
 
+// NOLINTNEXTLINE(misc-use-anonymous-namespace)
 static void json_response(httplib::Response& res, const json& j, int status = 200)
 {
     res.status = status;
     res.set_content(j.dump(), "application/json");
 }
 
+// NOLINTNEXTLINE(misc-use-anonymous-namespace)
 static bool check_auth(IStore& store, const httplib::Request& req, const std::string& user_id)
 {
     auto it = req.headers.find("X-API-Key");
@@ -29,6 +32,7 @@ static bool check_auth(IStore& store, const httplib::Request& req, const std::st
     return store.check_api_key(user_id, it->second);
 }
 
+// NOLINTNEXTLINE(misc-use-anonymous-namespace)
 static bool check_admin(const httplib::Request& req)
 {
     auto it = req.headers.find("Authorization");
@@ -45,8 +49,13 @@ static bool check_admin(const httplib::Request& req)
 }
 
 // Helper to log a completed request
-static void record_log(IStore& store, const httplib::Request& req, const httplib::Response& res,
-                       const std::string& user_id, std::int64_t start_ts, double duration_ms)
+// NOLINTNEXTLINE(misc-use-anonymous-namespace)
+static void record_log(IStore& store, 
+                       const httplib::Request& req,
+                       const httplib::Response& res,
+                       const std::string& user_id,
+                       std::int64_t start_ts, // NOLINT(bugprone-easily-swappable-parameters)
+                       double duration_ms) // NOLINT(bugprone-easily-swappable-parameters)
 {
     ApiLogRecord r;
     r.ts          = start_ts;
@@ -59,7 +68,8 @@ static void record_log(IStore& store, const httplib::Request& req, const httplib
     store.append_log(r);
 }
 
-void configure_routes(httplib::Server& svr, IStore& store)
+// NOLINTNEXTLINE(-warnings-as-errors)
+void configure_routes(httplib::Server& svr, IStore& store) // NOLINT(readability-function-cognitive-complexity)
 {
     // Health
     svr.Get("/health",

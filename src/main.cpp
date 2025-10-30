@@ -23,7 +23,8 @@ static std::unique_ptr<IStore> make_store()
 
 int main()
 {
-    try {
+    try
+    {
         auto store = make_store();
         store->set_api_key("demo", "secret-demo-key");
 
@@ -37,10 +38,14 @@ int main()
 
         std::cout << "[charizard] listening on " << bind_host << ":" << port << '\n';
         svr.listen(bind_host, port);
-    } catch (const std::exception& ex) {
+    }
+    catch (const std::exception& ex)
+    {
         std::cerr << "Fatal error: " << ex.what() << '\n';
         return EXIT_FAILURE;
-    } catch (...) {
+    }
+    catch (...)
+    {
         std::cerr << "Fatal error: unknown exception\n";
         return EXIT_FAILURE;
     }
