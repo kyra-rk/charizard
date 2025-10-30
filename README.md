@@ -238,6 +238,10 @@ You can also rebuild the service by running
 
 To run the style checker, run
 
+    $ make format-check
+
+You can fix style issues with
+
     $ make format
 
 To perform a static analysis on your code, run

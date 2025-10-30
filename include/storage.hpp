@@ -1,12 +1,12 @@
 #pragma once
 #include <chrono>
+#include <functional>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <sstream>
-#include <functional>
 
 struct TransitEvent
 {
@@ -16,7 +16,9 @@ struct TransitEvent
     std::int64_t ts          = 0;
     // Default and validating constructor. Implemented in src/transit_validator.cpp
     TransitEvent() = default;
-    TransitEvent(const std::string& user_id_, const std::string& mode_, double distance_km_, std::int64_t ts_ = 0);
+    TransitEvent(const std::string& user_id_, const std::string& mode_, double distance_km_,
+                 std::int64_t ts_ = 0) // NOLINT(bugprone-easily-swappable-parameters)
+        ;
 };
 
 struct ApiLogRecord
@@ -24,7 +26,7 @@ struct ApiLogRecord
     std::int64_t ts = 0; // epoch seconds
     std::string  method;
     std::string  path;
-    int          status = 0;
+    int          status      = 0;
     double       duration_ms = 0.0;
     std::string  client_ip;
     std::string  user_id; // empty if unknown
@@ -54,30 +56,29 @@ inline double emission_factor_for(const std::string& mode)
 
 struct IStore
 {
-    virtual ~IStore()                                                                 = default;
+    virtual ~IStore() = default;
     // Accepts an optional app_name metadata field. The underlying db should store a
     // hashed version of the key rather than the plaintext key for security purposes.
     virtual void set_api_key(const std::string& user, const std::string& key,
-                             const std::string& app_name = "")                       = 0;
+                             const std::string& app_name = "")                        = 0;
     virtual bool check_api_key(const std::string& user, const std::string& key) const = 0;
     // Logging and admin operations
-    virtual void append_log(const ApiLogRecord& rec) = 0;
-    virtual std::vector<ApiLogRecord> get_logs(std::size_t limit = 100) const = 0;
-    virtual void clear_logs() = 0;
-    virtual std::vector<std::string> get_clients() const = 0;
+    virtual void                      append_log(const ApiLogRecord& rec)                 = 0;
+    virtual std::vector<ApiLogRecord> get_logs(std::size_t limit = 100) const             = 0;
+    virtual void                      clear_logs()                                        = 0;
+    virtual std::vector<std::string>  get_clients() const                                 = 0;
     virtual std::vector<TransitEvent> get_client_data(const std::string& client_id) const = 0;
-    virtual void clear_db_events() = 0;
-    virtual void clear_db() = 0;
-    virtual void add_event(const TransitEvent& ev)                                    = 0;
-    virtual std::vector<TransitEvent> get_events(const std::string& user) const       = 0;
-    virtual FootprintSummary          summarize(const std::string& user)              = 0;
-    virtual double                    global_average_weekly()                         = 0;
+    virtual void                      clear_db_events()                                   = 0;
+    virtual void                      clear_db()                                          = 0;
+    virtual void                      add_event(const TransitEvent& ev)                   = 0;
+    virtual std::vector<TransitEvent> get_events(const std::string& user) const           = 0;
+    virtual FootprintSummary          summarize(const std::string& user)                  = 0;
+    virtual double                    global_average_weekly()                             = 0;
 };
 
 class InMemoryStore : public IStore
 {
   public:
-
     // API key management
 
     void set_api_key(const std::string& user, const std::string& key,
@@ -85,7 +86,7 @@ class InMemoryStore : public IStore
     {
         std::scoped_lock lk(mu_);
         const auto       h = hash_plain(key);
-        api_keys_[user]   = h;
+        api_keys_[user]    = h;
         if (!app_name.empty())
             app_names_[user] = app_name;
     }
@@ -125,7 +126,7 @@ class InMemoryStore : public IStore
 
     std::vector<std::string> get_clients() const override
     {
-        std::scoped_lock lk(mu_);
+        std::scoped_lock         lk(mu_);
         std::vector<std::string> out;
         out.reserve(events_.size());
         for (auto& [k, _] : events_)
@@ -190,8 +191,8 @@ class InMemoryStore : public IStore
         if (it == events_.end())
             return s;
 
-        auto week_start  = now - 7 * 24 * 3600;
-        auto month_start = now - 30 * 24 * 3600;
+        auto week_start  = now - (7 * 24 * 3600);
+        auto month_start = now - (30 * 24 * 3600);
 
         for (const auto& ev : it->second)
         {
@@ -216,7 +217,7 @@ class InMemoryStore : public IStore
         std::scoped_lock lk(mu_);
         std::size_t      users_with_data = 0;
         double           total           = 0.0;
-        auto             week_start      = now - 7 * 24 * 3600;
+        auto             week_start      = now - (7 * 24 * 3600);
 
         for (auto& [user, vec] : events_)
         {
@@ -253,8 +254,8 @@ class InMemoryStore : public IStore
     {
         // TO-DO: replace std::hash with something stronger later (eg. Argon2/bcrypt)
         std::hash<std::string> h;
-        auto v = h(key);
-        std::ostringstream oss;
+        auto                   v = h(key);
+        std::ostringstream     oss;
         oss << std::hex << v;
         return oss.str();
     }

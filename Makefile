@@ -164,13 +164,25 @@ lint: build
 	@echo "==> Running clang-tidy (no fixes) with $(CORES) jobs..."
 	@PATH="$(LLVM_BIN):$$PATH"; \
 	find $(FORMAT_PATHS) -type f \( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \) -print0 | \
-	  xargs -0 -n1 -P $(CORES) "$(CLANG_TIDY)" -p "$(BUILD_DIR)" --quiet
+	  xargs -0 -n1 -P $(CORES) "$(CLANG_TIDY)" \
+	    -p "$(BUILD_DIR)" --quiet \
+	    -header-filter='^(include|src|tests)/' \
+	    -extra-arg=-std=c++17 \
+	    -extra-arg=-isysroot$(shell xcrun --show-sdk-path) \
+	    -extra-arg=-isystem$(shell xcrun --show-sdk-path)/usr/include/c++/v1 \
+	    -extra-arg=-w
 
 lint-fix: build
 	@echo "==> Running clang-tidy with -fix (and formatting) ..."
 	@PATH="$(LLVM_BIN):$$PATH"; \
 	find $(FORMAT_PATHS) -type f \( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \) -print0 | \
-	  xargs -0 -n1 -P $(CORES) "$(CLANG_TIDY)" -p "$(BUILD_DIR)" -fix --format-style=file --quiet || true
+	  xargs -0 -n1 -P $(CORES) "$(CLANG_TIDY)" \
+	    -p "$(BUILD_DIR)" -fix --format-style=file --quiet \
+	    -header-filter='^(include|src|tests)/' \
+	    -extra-arg=-std=c++17 \
+	    -extra-arg=-isysroot$(shell xcrun --show-sdk-path) \
+	    -extra-arg=-isystem$(shell xcrun --show-sdk-path)/usr/include/c++/v1 \
+	    -extra-arg=-w || true
 	@$(MAKE) format
 
 check: format-check lint

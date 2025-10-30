@@ -1,6 +1,7 @@
 #pragma once
 
 #include "storage.hpp"
+
 #include <httplib.h>
 
 // Lightweight helper for tests that checks API key header against store.
