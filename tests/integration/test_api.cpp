@@ -606,9 +606,9 @@ TEST(ApiFootprint, Success_AccumulatesAndRespectsWindows)
     // - 10 days ago: distance 2
     // - 40 days ago: distance 3
     const std::time_t now = std::time(nullptr);
-    post_transit(cli, 1.0, "bus", now - (2 * 24 * 3600));
-    post_transit(cli, 2.0, "bus", now - (10 * 24 * 3600));
-    post_transit(cli, 3.0, "bus", now - (40 * 24 * 3600));
+    post_transit(cli, 1.0, "bus", now - static_cast<std::time_t>(2 * 24 * 3600));
+    post_transit(cli, 2.0, "bus", now - static_cast<std::time_t>(10 * 24 * 3600));
+    post_transit(cli, 3.0, "bus", now - static_cast<std::time_t>(40 * 24 * 3600));
 
     auto res = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
     ASSERT_TRUE(res != nullptr);
@@ -1118,7 +1118,7 @@ TEST(ApiAnalytics, Success_IgnoresEventsOlderThan7Days)
     httplib::Client  cli("127.0.0.1", server.port);
 
     const std::time_t now            = std::time(nullptr);
-    const std::time_t eight_days_ago = now - (8 * 24 * 3600);
+    const std::time_t eight_days_ago = now - static_cast<std::time_t>(8 * 24 * 3600);
 
     // Post an old event for demo and another user; both should be ignored
     post_transit(cli, /*distance_km=*/500.0, "bus", static_cast<std::int64_t>(eight_days_ago));

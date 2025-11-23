@@ -159,7 +159,7 @@ if(DEFINED CLANG_TIDY AND CLANG_TIDY)
     set(CMAKE_CXX_CLANG_TIDY
         ${CLANG_TIDY_BIN};
         -p=${CMAKE_BINARY_DIR};
-        --quiet;
+        -header-filter=^src/;
     )
   else()
     message(WARNING "Requested CLANG_TIDY=ON but clang-tidy not found")
