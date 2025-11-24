@@ -261,5 +261,42 @@ To run a coverage report on your tests, run
 As of the last time this codebase was modified, the coverage is as follows:
 ![Function (100%), Line (98.11%), Region (91.63%), Branch (79.23%)](assets/img/coverage.png "Coverage")
 
+## Continuous Integration
+
+This project uses GitHub Actions to automatically run tests, style checks, and static analysis on every pull request to the `main` branch.
+
+### What runs automatically in CI:
+- **All unit tests** — via `make test`, which includes all tests discovered by CTest
+- **All API/integration tests** — automatically run as part of `make test`
+- **Style checking** — via `make format-check` to ensure code follows the project's formatting standards
+- **Static analysis** — via `make lint` to catch potential code issues
+
+The CI workflow is defined in `.github/workflows/ci.yml` and runs on macOS (matching our primary development environment).
+
+### Viewing CI Results:
+1. Open a pull request to `main`
+2. GitHub will automatically trigger the CI workflow
+3. View the status on your PR page — green checkmark means all tests passed, red X means failures
+4. Click "Details" next to a failed check to see logs and identify what went wrong
+
+### Running CI checks locally:
+Before pushing, you can run the same checks locally to catch issues early:
+```bash
+# Run all tests
+$ make test
+
+# Check code formatting
+$ make format-check
+
+# Run static analysis
+$ make lint
+```
+
+### CI Reports:
+CI run results are visible in the "Actions" tab of the GitHub repository. Each workflow run shows:
+- Build logs
+- Test results with pass/fail status
+- Formatting and linting errors (if any)
+
 ----
 *Last updated October 29, 2025*
