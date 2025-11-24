@@ -18,16 +18,15 @@ jobs:
     
     - name: Install dependencies
       run: |
-        brew install cmake llvm clang-format
+        brew bundle
         
     - name: Configure and Build
       run: |
-        cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCHARIZARD_WITH_MONGO=OFF
-        cmake --build build -j
+        make build
     
     - name: Run all tests
       run: |
-        ctest --test-dir build --output-on-failure
+        make test
     
     - name: Run style checks
       run: |
