@@ -1398,3 +1398,440 @@ TEST(AdminDb, ClearDb_RemovesEverything_ClientsEmpty)
     ASSERT_TRUE(arr.is_array());
     EXPECT_EQ(arr.size(), 0U);
 }
+
+/* =================================================== */
+/* ---- Additional Branch Coverage Tests ------------ */
+/* =================================================== */
+
+// Test admin endpoints without ADMIN_API_KEY environment variable set
+TEST(AdminAuth, Unauthorized_NoAdminKeyEnvVar)
+{
+    // Temporarily unset ADMIN_API_KEY
+#ifdef _WIN32
+    _putenv_s("ADMIN_API_KEY", "");
+#else
+    unsetenv("ADMIN_API_KEY");
+#endif
+
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers const headers = { { "Authorization", "Bearer some-token" } };
+    auto                   res     = cli.Get("/admin/clients", headers);
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}
+
+// Test Authorization header without "Bearer " prefix
+TEST(AdminAuth, Unauthorized_MissingBearerPrefix)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers const headers = { { "Authorization", "super-secret" } }; // Missing "Bearer "
+    auto                   res     = cli.Get("/admin/clients", headers);
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}
+
+// Test user endpoints with missing user_id parameter
+TEST(ApiTransit, Unauthorized_UserNotRegistered)
+{
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // Try to post transit for a user that doesn't exist
+    auto res = cli.Post("/users/nonexistent/transit", demo_auth_headers(),
+                        R"({"mode":"bus","distance_km":1.0})", "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401); // Should be unauthorized
+}
+
+/* =================================================== */
+/* ---- Additional Edge Cases for Branch Coverage ---- */
+/* =================================================== */
+
+// Test JSON type error when getting wrong type from JSON field
+TEST(ApiTransit, JsonTypeError_ModeAsArray)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // mode is an array instead of string - should trigger json::exception
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":[],"distance_km":1.0})",
+                        "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 400);
+    auto j = json::parse(res->body);
+    // Should catch json::exception
+    EXPECT_TRUE(j.contains("error"));
+}
+
+// Test JSON type error when distance_km is wrong type
+TEST(ApiTransit, JsonTypeError_DistanceAsObject)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // distance_km is an object instead of number - should trigger json::exception
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"bus","distance_km":{}})",
+                        "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 400);
+    auto j = json::parse(res->body);
+    EXPECT_TRUE(j.contains("error"));
+}
+
+// Test JSON type error when ts is wrong type
+TEST(ApiTransit, JsonTypeError_TsAsString)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // ts is a string instead of number - should trigger json::exception
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(),
+                        R"({"mode":"bus","distance_km":5.0,"ts":"not-a-number"})", "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 400);
+    auto j = json::parse(res->body);
+    EXPECT_TRUE(j.contains("error"));
+}
+
+// Test all valid transit modes to ensure they work
+TEST(ApiTransit, AllValidModes_Success)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    const std::vector<std::string> modes = { "taxi", "car", "bus", "subway", "train", "bike", "walk" };
+
+    for (const auto& mode : modes)
+    {
+        json const body = { { "mode", mode }, { "distance_km", 1.0 } };
+        auto res = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
+
+        ASSERT_TRUE(res != nullptr) << "Failed for mode: " << mode;
+        EXPECT_EQ(res->status, 201) << "Failed for mode: " << mode;
+    }
+}
+
+// Test case-sensitive mode validation
+TEST(ApiTransit, Validation_InvalidMode_CaseSensitive)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // "Bus" with capital B should fail (modes are lowercase)
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"Bus","distance_km":1.0})",
+                        "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 400);
+    EXPECT_EQ(json::parse(res->body).value("error", ""), "invalid mode");
+}
+
+// Test zero timestamp explicitly (should use server time)
+TEST(ApiTransit, Success_ZeroTimestamp_UsesServerTime)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    json const body = { { "mode", "walk" }, { "distance_km", 2.0 }, { "ts", 0 } };
+    auto       res  = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 201);
+}
+
+// Test exact zero distance
+TEST(ApiTransit, Success_ExactZeroDistance)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"walk","distance_km":0.0})",
+                        "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 201);
+}
+
+// Test very large but valid distance
+TEST(ApiTransit, Success_VeryLargeDistance)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(),
+                        R"({"mode":"train","distance_km":99999.99})", "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 201);
+}
+
+// Test fractional distance values
+TEST(ApiTransit, Success_FractionalDistance)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"bike","distance_km":0.001})",
+                        "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 201);
+}
+
+// Test register with very long app_name
+TEST(ApiRegister, Register_Success_LongAppName)
+{
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    const std::string long_name(200, 'a'); // 200 character app name
+    json const        req = { { "app_name", long_name } };
+
+    auto res = cli.Post("/users/register", req.dump(), "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 201);
+
+    json const j = json::parse(res->body);
+    EXPECT_EQ(j.value("app_name", ""), long_name);
+}
+
+// Test register with special characters in app_name
+TEST(ApiRegister, Register_Success_SpecialCharsInAppName)
+{
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    json const req = { { "app_name", "my-app_name.test@2024!" } };
+
+    auto res = cli.Post("/users/register", req.dump(), "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 201);
+
+    json const j = json::parse(res->body);
+    EXPECT_EQ(j.value("app_name", ""), "my-app_name.test@2024!");
+}
+
+// Test footprint with subway mode to cover emission_factor_for subway branch
+TEST(ApiFootprint, Success_SubwayEmissions)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // Add subway transit event
+    auto res1 = cli.Post("/users/demo/transit", demo_auth_headers(),
+                         R"({"mode":"subway","distance_km":10.0})", "application/json");
+    ASSERT_TRUE(res1 != nullptr);
+    ASSERT_EQ(res1->status, 201);
+
+    // Get footprint - should calculate emissions using subway factor (0.04)
+    auto res2 = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
+    ASSERT_TRUE(res2 != nullptr);
+    EXPECT_EQ(res2->status, 200);
+
+    json const j = json::parse(res2->body);
+    // 10 km * 0.04 = 0.4 kg CO2
+    EXPECT_DOUBLE_EQ(j["lifetime_kg_co2"].get<double>(), 0.4);
+}
+
+// Test footprint with train mode to cover emission_factor_for train branch
+TEST(ApiFootprint, Success_TrainEmissions)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // Add train transit event
+    auto res1 = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"train","distance_km":50.0})",
+                         "application/json");
+    ASSERT_TRUE(res1 != nullptr);
+    ASSERT_EQ(res1->status, 201);
+
+    // Get footprint - should calculate emissions using train factor (0.04)
+    auto res2 = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
+    ASSERT_TRUE(res2 != nullptr);
+    EXPECT_EQ(res2->status, 200);
+
+    json const j = json::parse(res2->body);
+    // 50 km * 0.04 = 2.0 kg CO2
+    EXPECT_DOUBLE_EQ(j["lifetime_kg_co2"].get<double>(), 2.0);
+}
+
+// Test cache functionality - second call should hit cache
+TEST(ApiFootprint, Success_CacheHit)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // Add one event
+    auto res1 = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"car","distance_km":10.0})",
+                         "application/json");
+    ASSERT_TRUE(res1 != nullptr);
+    ASSERT_EQ(res1->status, 201);
+
+    // First call - calculates and caches
+    auto res2 = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
+    ASSERT_TRUE(res2 != nullptr);
+    EXPECT_EQ(res2->status, 200);
+
+    // Second call - should hit cache (line 187)
+    auto res3 = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
+    ASSERT_TRUE(res3 != nullptr);
+    EXPECT_EQ(res3->status, 200);
+
+    json const j = json::parse(res3->body);
+    // 10 km * 0.18 = 1.8 kg CO2
+    EXPECT_DOUBLE_EQ(j["lifetime_kg_co2"].get<double>(), 1.8);
+}
+
+// Test get_logs with more logs than limit to cover line 117
+TEST(AdminLogs, Logs_ExceedLimit_ReturnsLastN)
+{
+    set_admin_key("super-secret");
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // Generate more than 1000 logs by making many requests
+    // The admin endpoint calls get_logs(1000), so we need > 1000 to test the branch
+    for (int i = 0; i < 1050; i++)
+    {
+        cli.Get("/health");
+    }
+
+    // Get logs - should only return last 1000
+    auto res = cli.Get("/admin/logs", admin_auth_headers());
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 200);
+
+    json const j = json::parse(res->body);
+    ASSERT_TRUE(j.is_array());
+    EXPECT_EQ(j.size(), 1000); // Should be capped at limit of 1000
+}
+
+// Test admin endpoints - unauthorized paths (true branches of check_admin)
+TEST(AdminLogs, Unauthorized_GetLogs)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // Try to access admin endpoint with wrong auth
+    httplib::Headers bad_headers = { { "Authorization", "Bearer wrong-key" } };
+    auto             res         = cli.Get("/admin/logs", bad_headers);
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}
+
+TEST(AdminLogs, Unauthorized_DeleteLogs)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers bad_headers = { { "Authorization", "Bearer wrong-key" } };
+    auto             res         = cli.Delete("/admin/logs", bad_headers);
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}
+
+TEST(AdminClients, Unauthorized_GetClients)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers bad_headers = { { "Authorization", "Bearer wrong-key" } };
+    auto             res         = cli.Get("/admin/clients", bad_headers);
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}
+
+TEST(AdminClients, Unauthorized_GetClientData)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers bad_headers = { { "Authorization", "Bearer wrong-key" } };
+    auto             res         = cli.Get("/admin/clients/demo/data", bad_headers);
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}
+
+TEST(AdminDb, Unauthorized_ClearDbEvents)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers bad_headers = { { "Authorization", "Bearer wrong-key" } };
+    auto             res         = cli.Get("/admin/clear-db-events", bad_headers);
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}
+
+TEST(AdminDb, Unauthorized_ClearDb)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers bad_headers = { { "Authorization", "Bearer wrong-key" } };
+    auto             res         = cli.Get("/admin/clear-db", bad_headers);
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}

@@ -99,6 +99,7 @@ add_executable(charizard_unit_tests
   tests/unit/test_health.cpp
   tests/unit/test_transit_logic.cpp
   tests/unit/test_auth.cpp
+  tests/unit/test_storage.cpp
   $<TARGET_OBJECTS:charizard_api_obj>
   # Any other unit test files to compile and run
 )
