@@ -280,6 +280,22 @@ TEST(ApiRegister, Register_Success_TextPlainBody)
     EXPECT_EQ(j.value("app_name", ""), "plain");
 }
 
+TEST(ApiRegister, Register_Success_EmptyAppNameAllowed)
+{
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    json const body = { { "app_name", "" } }; // empty string is still a string
+    auto       res  = cli.Post("/users/register", body.dump(), "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 201);
+
+    json const j = json::parse(res->body);
+    EXPECT_EQ(j.value("app_name", "xxx"), "");
+}
+
 /* ============================================================= */
 /* ---------- POST /users/{user_id}/transit Testcases ---------- */
 /* ============================================================= */
@@ -685,6 +701,19 @@ TEST(ApiTransit, Validation_NegativeDistance)
     EXPECT_EQ(json::parse(res->body).value("error", ""), "Negative value for distance_km is not allowed.");
 }
 
+TEST(ApiTransit, Validation_ZeroDistanceAllowed)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    auto res = cli.Post("/users/demo/transit", demo_auth_headers(), R"({"mode":"walk","distance_km":0.0})",
+                        "application/json");
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 201); // Should succeed
+}
+
 TEST(ApiTransit, Validation_InvalidMode)
 {
     InMemoryStore mem;
@@ -697,6 +726,21 @@ TEST(ApiTransit, Validation_InvalidMode)
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 400);
     EXPECT_EQ(json::parse(res->body).value("error", ""), "invalid mode");
+}
+
+TEST(ApiTransit, MissingFields_BothModeAndDistanceAbsent)
+{
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    json const body = { { "ts", 123456789 } }; // neither mode nor distance_km
+    auto       res  = cli.Post("/users/demo/transit", demo_auth_headers(), body.dump(), "application/json");
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 400);
+    auto const j = json::parse(res->body);
+    EXPECT_EQ(j.value("error", ""), "missing_fields");
 }
 
 // unit-style integration for empty user_id validation (constructor throws)
@@ -1172,10 +1216,48 @@ TEST(AdminAuth, Unauthorized_WrongBearer)
     EXPECT_EQ(res->status, 401);
 }
 
+TEST(AdminAuth, Unauthorized_EnvKeyNotSet)
+{
+// Explicitly unset the ADMIN_API_KEY environment variable
+#ifdef _WIN32
+    _putenv("ADMIN_API_KEY=");
+#else
+    unsetenv("ADMIN_API_KEY");
+#endif
+
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers const hdr = { { "Authorization", "Bearer anything" } };
+    auto                   res = cli.Get("/admin/clients", hdr);
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+
+    // Restore for other tests
+    set_admin_key("super-secret");
+}
+
 /* =================================================== */
 /* ---------------- /admin/logs GET ------------------ */
 /* ---------------- /admin/logs DELETE --------------- */
 /* =================================================== */
+
+TEST(AdminLogs, GetLogs_EmptyWhenNoRequests)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    // No prior requests, logs should be empty
+    auto res = cli.Get("/admin/logs", admin_auth_headers());
+    ASSERT_TRUE(res != nullptr);
+    ASSERT_EQ(res->status, 200);
+    auto arr = json::parse(res->body);
+    ASSERT_TRUE(arr.is_array());
+    EXPECT_EQ(arr.size(), 0U);
+}
 
 TEST(AdminLogs, Logs_AppearAfterValidRequests_ThenCanBeCleared)
 {
