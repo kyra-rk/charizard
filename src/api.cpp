@@ -50,12 +50,10 @@ static bool check_admin(const httplib::Request& req)
 
 // Helper to log a completed request
 // NOLINTNEXTLINE(misc-use-anonymous-namespace)
-static void record_log(IStore& store, 
-                       const httplib::Request& req,
-                       const httplib::Response& res,
+static void record_log(IStore& store, const httplib::Request& req, const httplib::Response& res,
                        const std::string& user_id,
-                       std::int64_t start_ts, // NOLINT(bugprone-easily-swappable-parameters)
-                       double duration_ms) // NOLINT(bugprone-easily-swappable-parameters)
+                       std::int64_t       start_ts, // NOLINT(bugprone-easily-swappable-parameters)
+                       double             duration_ms)          // NOLINT(bugprone-easily-swappable-parameters)
 {
     ApiLogRecord r;
     r.ts          = start_ts;
@@ -69,7 +67,8 @@ static void record_log(IStore& store,
 }
 
 // NOLINTNEXTLINE(-warnings-as-errors)
-void configure_routes(httplib::Server& svr, IStore& store) // NOLINT(readability-function-cognitive-complexity)
+void configure_routes(httplib::Server& svr,
+                      IStore&          store) // NOLINT(readability-function-cognitive-complexity)
 {
     // Health
     svr.Get("/health",

@@ -99,6 +99,7 @@ add_executable(charizard_unit_tests
   tests/unit/test_health.cpp
   tests/unit/test_transit_logic.cpp
   tests/unit/test_auth.cpp
+  tests/unit/test_storage.cpp
   $<TARGET_OBJECTS:charizard_api_obj>
   # Any other unit test files to compile and run
 )
@@ -159,7 +160,7 @@ if(DEFINED CLANG_TIDY AND CLANG_TIDY)
     set(CMAKE_CXX_CLANG_TIDY
         ${CLANG_TIDY_BIN};
         -p=${CMAKE_BINARY_DIR};
-        --quiet;
+        -header-filter=^src/;
     )
   else()
     message(WARNING "Requested CLANG_TIDY=ON but clang-tidy not found")

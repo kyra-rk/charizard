@@ -11,6 +11,12 @@ TEST(TransitLogic, MissingFieldsThrows)
     EXPECT_THROW(make_transit_event_from_json("alice", j, 123), std::runtime_error);
 }
 
+TEST(TransitLogic, MissingDistanceKmThrows)
+{
+    const json j = { { "mode", "car" } };
+    EXPECT_THROW(make_transit_event_from_json("alice", j, 123), std::runtime_error);
+}
+
 TEST(TransitLogic, EmptyUserIdThrows)
 {
     const json j = { { "mode", "walk" }, { "distance_km", 1.0 } };
@@ -76,4 +82,16 @@ TEST(TransitLogic, LargeDistanceIsAllowed)
     const json j  = { { "mode", "car" }, { "distance_km", 1e6 } };
     auto       ev = make_transit_event_from_json("frank", j, 0);
     EXPECT_DOUBLE_EQ(ev.distance_km, 1e6);
+}
+
+TEST(TransitLogic, UsesSystemTimeWhenNowEpochIsZeroAndTsMissing)
+{
+    const json j = { { "mode", "bus" }, { "distance_km", 5.0 } };
+    // now_epoch=0 should trigger std::time(nullptr) call
+    auto ev = make_transit_event_from_json("george", j, 0);
+    EXPECT_EQ(ev.user_id, "george");
+    EXPECT_EQ(ev.mode, "bus");
+    EXPECT_DOUBLE_EQ(ev.distance_km, 5.0);
+    // ts should be a reasonable epoch time (> 1600000000 for year 2020+)
+    EXPECT_GT(ev.ts, 1600000000);
 }
