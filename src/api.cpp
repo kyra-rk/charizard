@@ -1,6 +1,8 @@
 #include "api.hpp"
 
 #include "storage.hpp"
+#include "emission_factors.hpp"
+#include "emission_data_loader.hpp"
 
 #include <cstdlib>
 #include <ctime>
@@ -393,4 +395,61 @@ void configure_routes(httplib::Server& svr,
                 store.clear_db();
                 json_response(res, { { "status", "ok" } });
             });
+
+    // Admin: list stored/default emission factors
+    svr.Get("/admin/emission-factors",
+            [&](const httplib::Request& req, httplib::Response& res)
+            {
+                if (!check_admin(req))
+                {
+                    json_response(res, { { "error", "unauthorized" } }, 401);
+                    return;
+                }
+
+                // Prefer persisted factors if the store has any; otherwise return DEFRA defaults
+                auto persisted = store.get_all_emission_factors();
+                json arr = json::array();
+                if (!persisted.empty())
+                {
+                    for (const auto &f : persisted)
+                    {
+                        arr.push_back({{"mode", f.mode}, {"fuel_type", f.fuel_type},
+                                       {"vehicle_size", f.vehicle_size}, {"kg_co2_per_km", f.kg_co2_per_km},
+                                       {"source", f.source}, {"updated_at", f.updated_at}});
+                    }
+                }
+                else
+                {
+                    auto factors = EmissionDataLoader::load_defra_2024();
+                    for (const auto &f : factors)
+                    {
+                        arr.push_back({{"mode", f.mode}, {"fuel_type", f.fuel_type},
+                                       {"vehicle_size", f.vehicle_size}, {"kg_co2_per_km", f.kg_co2_per_km},
+                                       {"source", f.source}, {"updated_at", f.updated_at}});
+                    }
+                }
+
+                json_response(res, arr);
+            });
+
+    // Admin: trigger loader to fetch DEFRA 2024 factors (returns count)
+    svr.Post("/admin/emission-factors/load",
+             [&](const httplib::Request& req, httplib::Response& res)
+             {
+                 if (!check_admin(req))
+                 {
+                    json_response(res, { { "error", "unauthorized" } }, 401);
+                    return;
+                 }
+
+                 // Load factors (currently from hardcoded DEFRA defaults). Persist to store.
+                 auto factors = EmissionDataLoader::load_defra_2024();
+                 int count = 0;
+                 for (const auto &f : factors)
+                 {
+                     store.store_emission_factor(f);
+                     count++;
+                 }
+                 json_response(res, { { "status", "ok" }, { "loaded", count } });
+             });
 }

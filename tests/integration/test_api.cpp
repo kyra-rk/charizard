@@ -1917,3 +1917,114 @@ TEST(AdminDb, Unauthorized_ClearDb)
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 401);
 }
+
+/* ---- Emission Factors Admin Tests ---- */
+
+TEST(AdminEmissionFactors, GetDefaults_ReturnsBasicDefaults)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    auto res = cli.Get("/admin/emission-factors", admin_auth_headers());
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 200);
+
+    auto j = json::parse(res->body);
+    EXPECT_TRUE(j.is_array());
+    EXPECT_GT(j.size(), 0);
+
+    // Check that we have basic defaults (not empty)
+    // All factors should have: mode, fuel_type, vehicle_size, kg_co2_per_km, source, updated_at
+    for (const auto& factor : j)
+    {
+        EXPECT_TRUE(factor.contains("mode"));
+        EXPECT_TRUE(factor.contains("kg_co2_per_km"));
+        EXPECT_TRUE(factor.contains("source"));
+    }
+
+    // Verify at least one car petrol small factor exists
+    bool found_car_petrol = false;
+    for (const auto& factor : j)
+    {
+        if (factor["mode"] == "car" && factor["fuel_type"] == "petrol" &&
+            factor["vehicle_size"] == "small")
+        {
+            found_car_petrol = true;
+            // DEFRA 2024 car petrol small should be ~0.167 (from defra_2024_factors())
+            EXPECT_NEAR(factor["kg_co2_per_km"].get<double>(), 0.167, 0.01);
+        }
+    }
+    EXPECT_TRUE(found_car_petrol) << "Should have car/petrol/small factor";
+}
+
+TEST(AdminEmissionFactors, LoadDefra2024_ReturnsCount)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    auto res = cli.Post("/admin/emission-factors/load", admin_auth_headers(), "", "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 200);
+
+    auto j = json::parse(res->body);
+    EXPECT_TRUE(j.contains("loaded"));
+    EXPECT_GT(j["loaded"].get<int>(), 0);
+
+    // Verify we got DEFRA factors now (should be more precise than basic)
+    // Get them back to verify
+    auto factors_res = cli.Get("/admin/emission-factors", admin_auth_headers());
+    ASSERT_TRUE(factors_res != nullptr);
+    EXPECT_EQ(factors_res->status, 200);
+
+    auto factors_j = json::parse(factors_res->body);
+    EXPECT_TRUE(factors_j.is_array());
+    EXPECT_GT(factors_j.size(), 0);
+
+    bool found_defra_car_petrol = false;
+    for (const auto& factor : factors_j)
+    {
+        if (factor["mode"] == "car" && factor["fuel_type"] == "petrol" &&
+            factor["vehicle_size"] == "small")
+        {
+            found_defra_car_petrol = true;
+            // DEFRA 2024 car petrol small should be ~0.167
+            EXPECT_NEAR(factor["kg_co2_per_km"].get<double>(), 0.167, 0.01);
+        }
+    }
+    EXPECT_TRUE(found_defra_car_petrol) << "Should have DEFRA car/petrol/small factor";
+}
+
+TEST(AdminEmissionFactors, LoadDefra2024_Unauthorized)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers bad_headers = { { "Authorization", "Bearer wrong-key" } };
+    auto             res         = cli.Post("/admin/emission-factors/load", bad_headers, "", "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}
+
+TEST(AdminEmissionFactors, GetFactors_Unauthorized)
+{
+    set_admin_key("super-secret");
+    InMemoryStore    mem;
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    httplib::Headers bad_headers = { { "Authorization", "Bearer wrong-key" } };
+    auto             res         = cli.Get("/admin/emission-factors", bad_headers);
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 401);
+}
+
