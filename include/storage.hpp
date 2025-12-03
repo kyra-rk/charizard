@@ -1,4 +1,6 @@
 #pragma once
+#include "emission_factors.hpp"
+
 #include <chrono>
 #include <functional>
 #include <mutex>
@@ -7,7 +9,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "emission_factors.hpp"
 
 struct TransitEvent
 {
@@ -15,14 +16,14 @@ struct TransitEvent
     std::string  mode;         // "car", "bus", "subway", "train", "bike", "walk", "taxi"
     std::string  fuel_type;    // for car/taxi: "petrol", "diesel", "electric", "hybrid"; empty for others
     std::string  vehicle_size; // for car/taxi: "small", "medium", "large"; empty for others
-    double       occupancy = 1.0; // number of passengers
+    double       occupancy   = 1.0; // number of passengers
     double       distance_km = 0.0;
     std::int64_t ts          = 0;
     // Default and validating constructor. Implemented in src/transit_validator.cpp
     TransitEvent() = default;
     TransitEvent(const std::string& user_id_, const std::string& mode_,
-                 double distance_km_, // NOLINT(bugprone-easily-swappable-parameters)
-                 std::int64_t ts_ = 0) // NOLINT(bugprone-easily-swappable-parameters)
+                 double       distance_km_, // NOLINT(bugprone-easily-swappable-parameters)
+                 std::int64_t ts_ = 0)      // NOLINT(bugprone-easily-swappable-parameters)
         ;
 };
 
@@ -85,12 +86,12 @@ struct IStore
     virtual FootprintSummary          summarize(const std::string& user)                  = 0;
     virtual double                    global_average_weekly()                             = 0;
     // Emission factor persistence (optional implementations)
-    virtual void store_emission_factor(const EmissionFactor& factor) = 0;
+    virtual void                          store_emission_factor(const EmissionFactor& factor)        = 0;
     virtual std::optional<EmissionFactor> get_emission_factor(const std::string& mode,
                                                               const std::string& fuel_type,
                                                               const std::string& vehicle_size) const = 0;
-    virtual std::vector<EmissionFactor> get_all_emission_factors() const = 0;
-    virtual void clear_emission_factors() = 0;
+    virtual std::vector<EmissionFactor>   get_all_emission_factors() const                           = 0;
+    virtual void                          clear_emission_factors()                                   = 0;
 };
 
 class InMemoryStore : public IStore
@@ -145,9 +146,10 @@ class InMemoryStore : public IStore
     void store_emission_factor(const EmissionFactor& factor) override
     {
         std::scoped_lock lk(mu_);
-        for (auto &f : emission_factors_)
+        for (auto& f : emission_factors_)
         {
-            if (f.mode == factor.mode && f.fuel_type == factor.fuel_type && f.vehicle_size == factor.vehicle_size)
+            if (f.mode == factor.mode && f.fuel_type == factor.fuel_type &&
+                f.vehicle_size == factor.vehicle_size)
             {
                 f = factor;
                 return;
@@ -156,12 +158,11 @@ class InMemoryStore : public IStore
         emission_factors_.push_back(factor);
     }
 
-    std::optional<EmissionFactor> get_emission_factor(const std::string& mode,
-                                                      const std::string& fuel_type,
+    std::optional<EmissionFactor> get_emission_factor(const std::string& mode, const std::string& fuel_type,
                                                       const std::string& vehicle_size) const override
     {
         std::scoped_lock lk(mu_);
-        for (const auto &f : emission_factors_)
+        for (const auto& f : emission_factors_)
         {
             if (f.mode == mode && f.fuel_type == fuel_type && f.vehicle_size == vehicle_size)
                 return f;
@@ -254,7 +255,7 @@ class InMemoryStore : public IStore
 
         for (const auto& ev : it->second)
         {
-            double kg = emission_factor_for(ev.mode) * ev.distance_km;
+            double kg = calculate_co2_emissions(ev.mode, ev.fuel_type, ev.vehicle_size, ev.occupancy, ev.distance_km);
             s.lifetime_kg_co2 += kg;
             if (ev.ts >= week_start)
                 s.week_kg_co2 += kg;
@@ -285,7 +286,7 @@ class InMemoryStore : public IStore
             {
                 if (ev.ts >= week_start)
                 {
-                    u_week += emission_factor_for(ev.mode) * ev.distance_km;
+                    u_week += calculate_co2_emissions(ev.mode, ev.fuel_type, ev.vehicle_size, ev.occupancy, ev.distance_km);
                     has = true;
                 }
             }
@@ -307,7 +308,7 @@ class InMemoryStore : public IStore
     std::unordered_map<std::string, std::vector<TransitEvent>> events_;
     std::unordered_map<std::string, FootprintSummary>          cache_;
     std::vector<ApiLogRecord>                                  logs_;
-        std::vector<EmissionFactor>                                 emission_factors_;
+    std::vector<EmissionFactor>                                emission_factors_;
 
     static std::string hash_plain(const std::string& key)
     {

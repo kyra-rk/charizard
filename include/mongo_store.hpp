@@ -243,7 +243,7 @@ class MongoStore : public IStore
         using bsoncxx::builder::basic::make_document;
         auto coll = db_["emission_factors"];
         // Use a compound key as _id: mode|fuel_type|vehicle_size
-        std::string id = factor.mode + "|" + factor.fuel_type + "|" + factor.vehicle_size;
+        std::string               id = factor.mode + "|" + factor.fuel_type + "|" + factor.vehicle_size;
         mongocxx::options::update opts;
         opts.upsert(true);
 
@@ -264,25 +264,24 @@ class MongoStore : public IStore
         coll.update_one(filter_doc.extract(), update_doc.extract(), opts);
     }
 
-    std::optional<EmissionFactor> get_emission_factor(const std::string& mode,
-                                                      const std::string& fuel_type,
+    std::optional<EmissionFactor> get_emission_factor(const std::string& mode, const std::string& fuel_type,
                                                       const std::string& vehicle_size) const override
     {
         using bsoncxx::builder::basic::kvp;
         using bsoncxx::builder::basic::make_document;
-        auto coll = db_["emission_factors"];
-        std::string id = mode + "|" + fuel_type + "|" + vehicle_size;
-        auto doc = coll.find_one(make_document(kvp("_id", id)));
+        auto        coll = db_["emission_factors"];
+        std::string id   = mode + "|" + fuel_type + "|" + vehicle_size;
+        auto        doc  = coll.find_one(make_document(kvp("_id", id)));
         if (!doc)
             return std::nullopt;
-        auto view = doc->view();
+        auto           view = doc->view();
         EmissionFactor f;
-        f.mode = std::string{ view["mode"].get_string().value };
-        f.fuel_type = std::string{ view["fuel_type"].get_string().value };
-        f.vehicle_size = std::string{ view["vehicle_size"].get_string().value };
+        f.mode          = std::string{ view["mode"].get_string().value };
+        f.fuel_type     = std::string{ view["fuel_type"].get_string().value };
+        f.vehicle_size  = std::string{ view["vehicle_size"].get_string().value };
         f.kg_co2_per_km = view["kg_co2_per_km"].get_double();
-        f.source = std::string{ view["source"].get_string().value };
-        f.updated_at = static_cast<std::int64_t>(view["updated_at"].get_int64().value);
+        f.source        = std::string{ view["source"].get_string().value };
+        f.updated_at    = static_cast<std::int64_t>(view["updated_at"].get_int64().value);
         return f;
     }
 
@@ -291,17 +290,17 @@ class MongoStore : public IStore
         using bsoncxx::builder::basic::kvp;
         using bsoncxx::builder::basic::make_document;
         std::vector<EmissionFactor> out;
-        auto coll = db_["emission_factors"];
-        auto cursor = coll.find({});
+        auto                        coll   = db_["emission_factors"];
+        auto                        cursor = coll.find({});
         for (auto&& d : cursor)
         {
             EmissionFactor f;
-            f.mode = std::string{ d["mode"].get_string().value };
-            f.fuel_type = std::string{ d["fuel_type"].get_string().value };
-            f.vehicle_size = std::string{ d["vehicle_size"].get_string().value };
+            f.mode          = std::string{ d["mode"].get_string().value };
+            f.fuel_type     = std::string{ d["fuel_type"].get_string().value };
+            f.vehicle_size  = std::string{ d["vehicle_size"].get_string().value };
             f.kg_co2_per_km = d["kg_co2_per_km"].get_double();
-            f.source = std::string{ d["source"].get_string().value };
-            f.updated_at = static_cast<std::int64_t>(d["updated_at"].get_int64().value);
+            f.source        = std::string{ d["source"].get_string().value };
+            f.updated_at    = static_cast<std::int64_t>(d["updated_at"].get_int64().value);
             out.push_back(std::move(f));
         }
         return out;

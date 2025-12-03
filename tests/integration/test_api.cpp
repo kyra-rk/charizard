@@ -1743,14 +1743,14 @@ TEST(ApiFootprint, Success_SubwayEmissions)
     ASSERT_TRUE(res1 != nullptr);
     ASSERT_EQ(res1->status, 201);
 
-    // Get footprint - should calculate emissions using subway factor (0.04)
+    // Get footprint - should calculate emissions using subway factor (DEFRA 2024: 0.041)
     auto res2 = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
     ASSERT_TRUE(res2 != nullptr);
     EXPECT_EQ(res2->status, 200);
 
     json const j = json::parse(res2->body);
-    // 10 km * 0.04 = 0.4 kg CO2
-    EXPECT_DOUBLE_EQ(j["lifetime_kg_co2"].get<double>(), 0.4);
+    // 10 km * 0.041 = 0.41 kg CO2
+    EXPECT_NEAR(j["lifetime_kg_co2"].get<double>(), 0.41, 0.001);
 }
 
 // Test footprint with train mode to cover emission_factor_for train branch
@@ -1767,14 +1767,14 @@ TEST(ApiFootprint, Success_TrainEmissions)
     ASSERT_TRUE(res1 != nullptr);
     ASSERT_EQ(res1->status, 201);
 
-    // Get footprint - should calculate emissions using train factor (0.04)
+    // Get footprint - should calculate emissions using train factor (DEFRA 2024: 0.051)
     auto res2 = cli.Get("/users/demo/lifetime-footprint", demo_auth_headers());
     ASSERT_TRUE(res2 != nullptr);
     EXPECT_EQ(res2->status, 200);
 
     json const j = json::parse(res2->body);
-    // 50 km * 0.04 = 2.0 kg CO2
-    EXPECT_DOUBLE_EQ(j["lifetime_kg_co2"].get<double>(), 2.0);
+    // 50 km * 0.051 = 2.55 kg CO2
+    EXPECT_NEAR(j["lifetime_kg_co2"].get<double>(), 2.55, 0.001);
 }
 
 // Test cache functionality - second call should hit cache
@@ -1949,8 +1949,7 @@ TEST(AdminEmissionFactors, GetDefaults_ReturnsBasicDefaults)
     bool found_car_petrol = false;
     for (const auto& factor : j)
     {
-        if (factor["mode"] == "car" && factor["fuel_type"] == "petrol" &&
-            factor["vehicle_size"] == "small")
+        if (factor["mode"] == "car" && factor["fuel_type"] == "petrol" && factor["vehicle_size"] == "small")
         {
             found_car_petrol = true;
             // DEFRA 2024 car petrol small should be ~0.167 (from defra_2024_factors())
@@ -1989,8 +1988,7 @@ TEST(AdminEmissionFactors, LoadDefra2024_ReturnsCount)
     bool found_defra_car_petrol = false;
     for (const auto& factor : factors_j)
     {
-        if (factor["mode"] == "car" && factor["fuel_type"] == "petrol" &&
-            factor["vehicle_size"] == "small")
+        if (factor["mode"] == "car" && factor["fuel_type"] == "petrol" && factor["vehicle_size"] == "small")
         {
             found_defra_car_petrol = true;
             // DEFRA 2024 car petrol small should be ~0.167
@@ -2008,7 +2006,7 @@ TEST(AdminEmissionFactors, LoadDefra2024_Unauthorized)
     httplib::Client  cli("127.0.0.1", server.port);
 
     httplib::Headers bad_headers = { { "Authorization", "Bearer wrong-key" } };
-    auto             res         = cli.Post("/admin/emission-factors/load", bad_headers, "", "application/json");
+    auto             res = cli.Post("/admin/emission-factors/load", bad_headers, "", "application/json");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 401);
@@ -2027,4 +2025,3 @@ TEST(AdminEmissionFactors, GetFactors_Unauthorized)
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 401);
 }
-

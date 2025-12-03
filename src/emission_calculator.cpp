@@ -1,8 +1,8 @@
-#include "storage.hpp"
 #include "emission_factors.hpp"
+#include "storage.hpp"
 
-#include <stdexcept>
 #include <cmath>
+#include <stdexcept>
 
 double calculate_co2_emissions(const std::string& mode, const std::string& fuel_type,
                                const std::string& vehicle_size, double occupancy, double distance_km)
@@ -20,7 +20,8 @@ double calculate_co2_emissions(const std::string& mode, const std::string& fuel_
 
     // Get the appropriate emission factor
     // First try to get from database/external sources via DefaultEmissionFactors
-    std::optional<EmissionFactor> factor_opt = DefaultEmissionFactors::get_default_factor(mode, fuel_type, vehicle_size);
+    std::optional<EmissionFactor> factor_opt =
+        DefaultEmissionFactors::get_default_factor(mode, fuel_type, vehicle_size);
 
     if (!factor_opt)
     {

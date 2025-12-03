@@ -1,8 +1,8 @@
 #include "api.hpp"
 
-#include "storage.hpp"
-#include "emission_factors.hpp"
 #include "emission_data_loader.hpp"
+#include "emission_factors.hpp"
+#include "storage.hpp"
 
 #include <cstdlib>
 #include <ctime>
@@ -408,24 +408,30 @@ void configure_routes(httplib::Server& svr,
 
                 // Prefer persisted factors if the store has any; otherwise return DEFRA defaults
                 auto persisted = store.get_all_emission_factors();
-                json arr = json::array();
+                json arr       = json::array();
                 if (!persisted.empty())
                 {
-                    for (const auto &f : persisted)
+                    for (const auto& f : persisted)
                     {
-                        arr.push_back({{"mode", f.mode}, {"fuel_type", f.fuel_type},
-                                       {"vehicle_size", f.vehicle_size}, {"kg_co2_per_km", f.kg_co2_per_km},
-                                       {"source", f.source}, {"updated_at", f.updated_at}});
+                        arr.push_back({ { "mode", f.mode },
+                                        { "fuel_type", f.fuel_type },
+                                        { "vehicle_size", f.vehicle_size },
+                                        { "kg_co2_per_km", f.kg_co2_per_km },
+                                        { "source", f.source },
+                                        { "updated_at", f.updated_at } });
                     }
                 }
                 else
                 {
                     auto factors = EmissionDataLoader::load_defra_2024();
-                    for (const auto &f : factors)
+                    for (const auto& f : factors)
                     {
-                        arr.push_back({{"mode", f.mode}, {"fuel_type", f.fuel_type},
-                                       {"vehicle_size", f.vehicle_size}, {"kg_co2_per_km", f.kg_co2_per_km},
-                                       {"source", f.source}, {"updated_at", f.updated_at}});
+                        arr.push_back({ { "mode", f.mode },
+                                        { "fuel_type", f.fuel_type },
+                                        { "vehicle_size", f.vehicle_size },
+                                        { "kg_co2_per_km", f.kg_co2_per_km },
+                                        { "source", f.source },
+                                        { "updated_at", f.updated_at } });
                     }
                 }
 
@@ -438,14 +444,14 @@ void configure_routes(httplib::Server& svr,
              {
                  if (!check_admin(req))
                  {
-                    json_response(res, { { "error", "unauthorized" } }, 401);
-                    return;
+                     json_response(res, { { "error", "unauthorized" } }, 401);
+                     return;
                  }
 
                  // Load factors (currently from hardcoded DEFRA defaults). Persist to store.
                  auto factors = EmissionDataLoader::load_defra_2024();
-                 int count = 0;
-                 for (const auto &f : factors)
+                 int  count   = 0;
+                 for (const auto& f : factors)
                  {
                      store.store_emission_factor(f);
                      count++;

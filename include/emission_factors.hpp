@@ -10,11 +10,11 @@
  */
 struct EmissionFactor
 {
-    std::string mode;          // "car", "bus", "subway", "train", "bike", "walk", "taxi"
-    std::string fuel_type;     // for car/taxi: "petrol", "diesel", "electric", "hybrid"; empty for others
-    std::string vehicle_size;  // for car/taxi: "small", "medium", "large"; empty for others
-    double      kg_co2_per_km; // per-passenger kg CO2e per km
-    std::string source;        // e.g., "DEFRA-2024", "EPA-2023"
+    std::string  mode;           // "car", "bus", "subway", "train", "bike", "walk", "taxi"
+    std::string  fuel_type;      // for car/taxi: "petrol", "diesel", "electric", "hybrid"; empty for others
+    std::string  vehicle_size;   // for car/taxi: "small", "medium", "large"; empty for others
+    double       kg_co2_per_km;  // per-passenger kg CO2e per km
+    std::string  source;         // e.g., "DEFRA-2024", "EPA-2023"
     std::int64_t updated_at = 0; // epoch seconds when this was last updated
 };
 
@@ -32,9 +32,8 @@ class IEmissionFactorStore
 
     // Retrieve a factor by mode, fuel_type, vehicle_size
     // Returns std::nullopt if not found
-    virtual std::optional<EmissionFactor> get_factor(const std::string& mode,
-                                                       const std::string& fuel_type,
-                                                       const std::string& vehicle_size) const = 0;
+    virtual std::optional<EmissionFactor> get_factor(const std::string& mode, const std::string& fuel_type,
+                                                     const std::string& vehicle_size) const = 0;
 
     // Retrieve all factors for a given mode
     virtual std::vector<EmissionFactor> get_factors_by_mode(const std::string& mode) const = 0;
@@ -81,6 +80,6 @@ class DefaultEmissionFactors
      * Used as fallback when specific factor not found in database.
      */
     static std::optional<EmissionFactor> get_default_factor(const std::string& mode,
-                                                             const std::string& fuel_type,
-                                                             const std::string& vehicle_size);
+                                                            const std::string& fuel_type,
+                                                            const std::string& vehicle_size);
 };

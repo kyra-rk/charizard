@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "emission_data_loader.hpp"
+
+#include <gtest/gtest.h>
 
 class EmissionDataLoaderTest : public ::testing::Test
 {
@@ -31,10 +31,10 @@ TEST_F(EmissionDataLoaderTest, DEFRA2024IncludesAllFuelTypes)
 {
     auto factors = EmissionDataLoader::load_defra_2024();
 
-    bool has_petrol = false;
-    bool has_diesel = false;
+    bool has_petrol   = false;
+    bool has_diesel   = false;
     bool has_electric = false;
-    bool has_hybrid = false;
+    bool has_hybrid   = false;
 
     for (const auto& f : factors)
     {
@@ -61,9 +61,9 @@ TEST_F(EmissionDataLoaderTest, DEFRA2024IncludesPublicTransit)
 {
     auto factors = EmissionDataLoader::load_defra_2024();
 
-    bool has_bus = false;
+    bool has_bus    = false;
     bool has_subway = false;
-    bool has_train = false;
+    bool has_train  = false;
 
     for (const auto& f : factors)
     {
@@ -151,10 +151,7 @@ TEST_F(EmissionDataLoaderTest, LoadFromJSONInvalidArray)
 {
     std::string json_str = R"({ "mode": "car" })";
 
-    EXPECT_THROW(
-        EmissionDataLoader::load_from_json(json_str),
-        std::runtime_error
-    );
+    EXPECT_THROW(EmissionDataLoader::load_from_json(json_str), std::runtime_error);
 }
 
 TEST_F(EmissionDataLoaderTest, LoadFromJSONMissingRequiredField)
@@ -166,10 +163,7 @@ TEST_F(EmissionDataLoaderTest, LoadFromJSONMissingRequiredField)
       }
     ])";
 
-    EXPECT_THROW(
-        EmissionDataLoader::load_from_json(json_str),
-        std::runtime_error
-    );
+    EXPECT_THROW(EmissionDataLoader::load_from_json(json_str), std::runtime_error);
 }
 
 // ===== CSV Loading =====
@@ -222,10 +216,7 @@ TEST_F(EmissionDataLoaderTest, LoadFromCSVInvalidNumber)
     std::string csv_str = R"(mode,fuel_type,vehicle_size,kg_co2_per_km,source
 car,petrol,small,invalid,TEST-SOURCE)";
 
-    EXPECT_THROW(
-        EmissionDataLoader::load_from_csv(csv_str),
-        std::runtime_error
-    );
+    EXPECT_THROW(EmissionDataLoader::load_from_csv(csv_str), std::runtime_error);
 }
 
 TEST_F(EmissionDataLoaderTest, LoadFromCSVMissingColumns)
@@ -233,18 +224,12 @@ TEST_F(EmissionDataLoaderTest, LoadFromCSVMissingColumns)
     std::string csv_str = R"(mode,fuel_type,vehicle_size,kg_co2_per_km,source
 car,petrol,small)";
 
-    EXPECT_THROW(
-        EmissionDataLoader::load_from_csv(csv_str),
-        std::runtime_error
-    );
+    EXPECT_THROW(EmissionDataLoader::load_from_csv(csv_str), std::runtime_error);
 }
 
 TEST_F(EmissionDataLoaderTest, LoadFromCSVEmpty)
 {
     std::string csv_str = "";
 
-    EXPECT_THROW(
-        EmissionDataLoader::load_from_csv(csv_str),
-        std::runtime_error
-    );
+    EXPECT_THROW(EmissionDataLoader::load_from_csv(csv_str), std::runtime_error);
 }

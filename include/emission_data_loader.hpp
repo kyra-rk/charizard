@@ -9,7 +9,8 @@
  * Can fetch from online APIs or static sources and convert to our format.
  *
  * Supports:
- * - DEFRA UK Government conversion factors (https://www.gov.uk/guidance/greenhouse-gas-reporting-conversion-factors-2024)
+ * - DEFRA UK Government conversion factors
+ * (https://www.gov.uk/guidance/greenhouse-gas-reporting-conversion-factors-2024)
  * - Other sources can be added as needed
  */
 class EmissionDataLoader

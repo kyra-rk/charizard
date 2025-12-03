@@ -1,4 +1,5 @@
 #include "emission_data_loader.hpp"
+
 #include "emission_factors.hpp"
 
 #include <nlohmann/json.hpp>
@@ -38,12 +39,12 @@ std::vector<EmissionFactor> EmissionDataLoader::load_from_json(const std::string
             }
 
             EmissionFactor factor;
-            factor.mode = item.at("mode").get<std::string>();
-            factor.fuel_type = item.value("fuel_type", "");
-            factor.vehicle_size = item.value("vehicle_size", "");
+            factor.mode          = item.at("mode").get<std::string>();
+            factor.fuel_type     = item.value("fuel_type", "");
+            factor.vehicle_size  = item.value("vehicle_size", "");
             factor.kg_co2_per_km = item.at("kg_co2_per_km").get<double>();
-            factor.source = item.value("source", "UNKNOWN");
-            factor.updated_at = item.value("updated_at", static_cast<std::int64_t>(0));
+            factor.source        = item.value("source", "UNKNOWN");
+            factor.updated_at    = item.value("updated_at", static_cast<std::int64_t>(0));
 
             factors.push_back(std::move(factor));
         }
@@ -59,8 +60,8 @@ std::vector<EmissionFactor> EmissionDataLoader::load_from_json(const std::string
 std::vector<EmissionFactor> EmissionDataLoader::load_from_csv(const std::string& csv_str)
 {
     std::vector<EmissionFactor> factors;
-    std::istringstream iss(csv_str);
-    std::string line;
+    std::istringstream          iss(csv_str);
+    std::string                 line;
 
     // Skip header
     if (!std::getline(iss, line))
@@ -79,12 +80,10 @@ std::vector<EmissionFactor> EmissionDataLoader::load_from_csv(const std::string&
             continue;
 
         std::istringstream row_stream(line);
-        std::string mode, fuel_type, vehicle_size, kg_str, source;
+        std::string        mode, fuel_type, vehicle_size, kg_str, source;
 
-        if (!std::getline(row_stream, mode, ',') ||
-            !std::getline(row_stream, fuel_type, ',') ||
-            !std::getline(row_stream, vehicle_size, ',') ||
-            !std::getline(row_stream, kg_str, ',') ||
+        if (!std::getline(row_stream, mode, ',') || !std::getline(row_stream, fuel_type, ',') ||
+            !std::getline(row_stream, vehicle_size, ',') || !std::getline(row_stream, kg_str, ',') ||
             !std::getline(row_stream, source, ','))
         {
             throw std::runtime_error("CSV format error at row " + std::to_string(row_num));
@@ -108,18 +107,19 @@ std::vector<EmissionFactor> EmissionDataLoader::load_from_csv(const std::string&
             double kg_co2_per_km = std::stod(kg_str);
 
             EmissionFactor factor;
-            factor.mode = mode;
-            factor.fuel_type = fuel_type;
-            factor.vehicle_size = vehicle_size;
+            factor.mode          = mode;
+            factor.fuel_type     = fuel_type;
+            factor.vehicle_size  = vehicle_size;
             factor.kg_co2_per_km = kg_co2_per_km;
-            factor.source = source;
-            factor.updated_at = 0; // CSV doesn't have timestamps
+            factor.source        = source;
+            factor.updated_at    = 0; // CSV doesn't have timestamps
 
             factors.push_back(std::move(factor));
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error("Failed to parse kg_co2_per_km at row " + std::to_string(row_num) + ": " + e.what());
+            throw std::runtime_error("Failed to parse kg_co2_per_km at row " + std::to_string(row_num) +
+                                     ": " + e.what());
         }
     }
 
