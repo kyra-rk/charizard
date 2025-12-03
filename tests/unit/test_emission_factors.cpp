@@ -112,20 +112,17 @@ TEST(EmissionCalculation, OccupancySharingEffect)
 
 TEST(EmissionCalculation, InvalidNegativeOccupancy)
 {
-    EXPECT_THROW(calculate_co2_emissions("car", "petrol", "small", -1.0, 10.0),
-                 std::runtime_error);
+    EXPECT_THROW(calculate_co2_emissions("car", "petrol", "small", -1.0, 10.0), std::runtime_error);
 }
 
 TEST(EmissionCalculation, InvalidZeroOccupancy)
 {
-    EXPECT_THROW(calculate_co2_emissions("car", "petrol", "small", 0.0, 10.0),
-                 std::runtime_error);
+    EXPECT_THROW(calculate_co2_emissions("car", "petrol", "small", 0.0, 10.0), std::runtime_error);
 }
 
 TEST(EmissionCalculation, InvalidNegativeDistance)
 {
-    EXPECT_THROW(calculate_co2_emissions("car", "petrol", "small", 1.0, -10.0),
-                 std::runtime_error);
+    EXPECT_THROW(calculate_co2_emissions("car", "petrol", "small", 1.0, -10.0), std::runtime_error);
 }
 
 TEST(EmissionCalculation, ValidZeroDistance)

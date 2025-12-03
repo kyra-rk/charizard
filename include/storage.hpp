@@ -255,7 +255,8 @@ class InMemoryStore : public IStore
 
         for (const auto& ev : it->second)
         {
-            double kg = calculate_co2_emissions(ev.mode, ev.fuel_type, ev.vehicle_size, ev.occupancy, ev.distance_km);
+            double kg =
+                calculate_co2_emissions(ev.mode, ev.fuel_type, ev.vehicle_size, ev.occupancy, ev.distance_km);
             s.lifetime_kg_co2 += kg;
             if (ev.ts >= week_start)
                 s.week_kg_co2 += kg;
@@ -286,7 +287,8 @@ class InMemoryStore : public IStore
             {
                 if (ev.ts >= week_start)
                 {
-                    u_week += calculate_co2_emissions(ev.mode, ev.fuel_type, ev.vehicle_size, ev.occupancy, ev.distance_km);
+                    u_week += calculate_co2_emissions(ev.mode, ev.fuel_type, ev.vehicle_size, ev.occupancy,
+                                                      ev.distance_km);
                     has = true;
                 }
             }
