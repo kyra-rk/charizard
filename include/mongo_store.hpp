@@ -144,6 +144,7 @@ class MongoStore : public IStore
         db_["events"].delete_many({});
         db_["api_keys"].delete_many({});
         db_["api_logs"].delete_many({});
+        db_["emission_factors"].delete_many({});
     }
 
     // Helpers for client API calls
@@ -233,6 +234,82 @@ class MongoStore : public IStore
         for (auto& [_, v] : user_week)
             tot += v;
         return tot / static_cast<double>(user_week.size());
+    }
+
+    // Emission factor persistence
+    void store_emission_factor(const EmissionFactor& factor) override
+    {
+        using bsoncxx::builder::basic::kvp;
+        using bsoncxx::builder::basic::make_document;
+        auto coll = db_["emission_factors"];
+        // Use a compound key as _id: mode|fuel_type|vehicle_size
+        std::string               id = factor.mode + "|" + factor.fuel_type + "|" + factor.vehicle_size;
+        mongocxx::options::update opts;
+        opts.upsert(true);
+
+        bsoncxx::builder::basic::document filter_doc{};
+        filter_doc.append(bsoncxx::builder::basic::kvp("_id", id));
+
+        bsoncxx::builder::basic::document set_doc{};
+        set_doc.append(bsoncxx::builder::basic::kvp("mode", factor.mode));
+        set_doc.append(bsoncxx::builder::basic::kvp("fuel_type", factor.fuel_type));
+        set_doc.append(bsoncxx::builder::basic::kvp("vehicle_size", factor.vehicle_size));
+        set_doc.append(bsoncxx::builder::basic::kvp("kg_co2_per_km", factor.kg_co2_per_km));
+        set_doc.append(bsoncxx::builder::basic::kvp("source", factor.source));
+        set_doc.append(bsoncxx::builder::basic::kvp("updated_at", static_cast<long long>(factor.updated_at)));
+
+        bsoncxx::builder::basic::document update_doc{};
+        update_doc.append(bsoncxx::builder::basic::kvp("$set", set_doc.extract()));
+
+        coll.update_one(filter_doc.extract(), update_doc.extract(), opts);
+    }
+
+    std::optional<EmissionFactor> get_emission_factor(const std::string& mode, const std::string& fuel_type,
+                                                      const std::string& vehicle_size) const override
+    {
+        using bsoncxx::builder::basic::kvp;
+        using bsoncxx::builder::basic::make_document;
+        auto        coll = db_["emission_factors"];
+        std::string id   = mode + "|" + fuel_type + "|" + vehicle_size;
+        auto        doc  = coll.find_one(make_document(kvp("_id", id)));
+        if (!doc)
+            return std::nullopt;
+        auto           view = doc->view();
+        EmissionFactor f;
+        f.mode          = std::string{ view["mode"].get_string().value };
+        f.fuel_type     = std::string{ view["fuel_type"].get_string().value };
+        f.vehicle_size  = std::string{ view["vehicle_size"].get_string().value };
+        f.kg_co2_per_km = view["kg_co2_per_km"].get_double();
+        f.source        = std::string{ view["source"].get_string().value };
+        f.updated_at    = static_cast<std::int64_t>(view["updated_at"].get_int64().value);
+        return f;
+    }
+
+    std::vector<EmissionFactor> get_all_emission_factors() const override
+    {
+        using bsoncxx::builder::basic::kvp;
+        using bsoncxx::builder::basic::make_document;
+        std::vector<EmissionFactor> out;
+        auto                        coll   = db_["emission_factors"];
+        auto                        cursor = coll.find({});
+        for (auto&& d : cursor)
+        {
+            EmissionFactor f;
+            f.mode          = std::string{ d["mode"].get_string().value };
+            f.fuel_type     = std::string{ d["fuel_type"].get_string().value };
+            f.vehicle_size  = std::string{ d["vehicle_size"].get_string().value };
+            f.kg_co2_per_km = d["kg_co2_per_km"].get_double();
+            f.source        = std::string{ d["source"].get_string().value };
+            f.updated_at    = static_cast<std::int64_t>(d["updated_at"].get_int64().value);
+            out.push_back(std::move(f));
+        }
+        return out;
+    }
+
+    void clear_emission_factors() override
+    {
+        auto coll = db_["emission_factors"];
+        coll.delete_many({});
     }
 
   private:

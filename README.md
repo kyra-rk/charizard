@@ -5,6 +5,35 @@ The server stores and aggregates logged data over configurable windows (week, mo
 
 See Github [Issues](https://github.com/kyra-rk/charizard/issues) page for ongoing project management!
 
+## Emission Factors Architecture
+
+The service calculates CO2 emissions for transit events using **DEFRA 2024 UK Government greenhouse gas conversion factors**. Rather than calling external APIs, factors are loaded from online sources and **persisted locally** (in-memory or MongoDB) for repeated use.
+
+### Data Model
+
+An `EmissionFactor` contains:
+- **mode**: Transportation type (`car`, `bus`, `subway`, `train`, `bike`, `walk`, `taxi`)
+- **fuel_type**: For cars/taxis only (`petrol`, `diesel`, `electric`, `hybrid`)
+- **vehicle_size**: For cars/taxis only (`small`, `medium`, `large`)
+- **kg_co2_per_km**: Emissions per passenger-km (well-to-wheel, includes fuel production)
+- **source**: Data origin (e.g., `DEFRA-2024`, `EPA-2023`)
+- **updated_at**: Epoch timestamp when last updated
+
+### Calculation Logic
+
+When a transit event is recorded, the service:
+1. Looks up the appropriate emission factor (or loads default DEFRA factors if store is empty)
+2. For **private vehicles** (car, taxi): multiplies `factor × distance ÷ occupancy` (passenger sharing reduces per-capita emissions)
+3. For **public transit** (bus, subway, train): uses pre-averaged per-passenger factors (occupancy already factored in)
+4. Returns total CO2 in kg CO2e
+
+**Example:**
+- Petrol medium car: 0.203 kg CO2e/km
+- 10 km trip, 1 passenger: 0.203 × 10 ÷ 1 = **2.03 kg CO2e**
+- 10 km trip with 2 passengers: 0.203 × 10 ÷ 2 = **1.015 kg CO2e** per person
+
+Source: [UK Government Greenhouse Gas Reporting Conversion Factors 2024](https://www.gov.uk/guidance/greenhouse-gas-reporting-conversion-factors-2024)
+
 ## Building & Running the Service
 Running the program is simple:
 ```
@@ -203,8 +232,20 @@ $ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://local
 # Clear only events collection (GET /admin/clear-db-events)
 $ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clear-db-events
 
-# Clear entire DB (events, api_keys, logs) (GET /admin/clear-db)
+# Clear entire DB (events, api_keys, logs, emission_factors) (GET /admin/clear-db)
 $ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clear-db
+```
+
+# List stored factors (returns persisted factors, or DEFRA defaults if store is empty)
+```bash
+$ curl -H "Authorization: Bearer changeme_admin_key_please_replace" \
+    http://localhost:8080/admin/emission-factors | jq
+```
+
+# Load and persist DEFRA 2024 factors (loads hardcoded defaults into the store)
+```bash
+$ curl -X POST -H "Authorization: Bearer changeme_admin_key_please_replace" \
+    http://localhost:8080/admin/emission-factors/load | jq
 ```
 
 ## Development Notes
