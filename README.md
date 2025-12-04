@@ -5,6 +5,8 @@ The server stores and aggregates logged data over configurable windows (week, mo
 
 See Github [Issues](https://github.com/kyra-rk/charizard/issues) page for ongoing project management!
 
+Demo Client App: https://github.com/RhysTalley/charizard_client_app
+
 ## Emission Factors Architecture
 
 The service calculates CO2 emissions for transit events using **DEFRA 2024 UK Government greenhouse gas conversion factors**. Rather than calling external APIs, factors are loaded from online sources and **persisted locally** (in-memory or MongoDB) for repeated use.
