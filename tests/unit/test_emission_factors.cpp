@@ -239,3 +239,39 @@ TEST(DefaultEmissionFactors, Defra2024Bus)
     }
     EXPECT_TRUE(found);
 }
+
+TEST(EmissionCalculation, FallbackCarUnknownSizeDividesByOccupancy)
+{
+    double kg = calculate_co2_emissions("car", "petrol", "monster-truck", 2.0, 10.0);
+    EXPECT_NEAR(kg, 0.90, 1e-3);
+}
+
+TEST(EmissionCalculation, FallbackTaxiUnknownFuelDividesByOccupancy)
+{
+    double kg = calculate_co2_emissions("taxi", "hydrogen", "medium", 3.0, 12.0);
+    EXPECT_NEAR(kg, 0.72, 1e-3);
+}
+
+TEST(EmissionCalculation, UndergroundSynonymUsesTransitFactorNoDivision)
+{
+    double kg = calculate_co2_emissions("underground", "", "", 10.0, 20.0);
+    EXPECT_NEAR(kg, 0.82, 1e-3);
+}
+
+TEST(EmissionCalculation, RailSynonymUsesTransitFactor)
+{
+    double kg = calculate_co2_emissions("rail", "", "", 4.0, 50.0);
+    EXPECT_NEAR(kg, 2.05, 1e-3);
+}
+
+TEST(EmissionCalculation, UnknownModeConservativeFallback)
+{
+    double kg = calculate_co2_emissions("hoverboard", "", "", 1.0, 7.5);
+    EXPECT_NEAR(kg, 0.75, 1e-6);
+}
+
+TEST(EmissionCalculation, BikeFallbackZeroEvenOnLookupMiss)
+{
+    double kg = calculate_co2_emissions("bike", "whatever", "xxl", 1.0, 123.0);
+    EXPECT_DOUBLE_EQ(kg, 0.0);
+}
