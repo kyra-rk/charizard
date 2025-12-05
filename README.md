@@ -60,18 +60,7 @@ When a transit event is recorded, the service:
 
 Source: [UK Government Greenhouse Gas Reporting Conversion Factors 2024](https://www.gov.uk/guidance/greenhouse-gas-reporting-conversion-factors-2024)
 
-## 3. Deployment
-(Add: how to deploy to GCP, how to redeploy, how mentor can “drive” the service, required env vars, differences in local vs cloud.)
 
-### Required Environment Variables
-Cloud Run deployment requires setting:
-    - ADMIN_API_KEY — operator key for admin endpoints
-    - MONGO_URI (optional) — presence triggers MongoDB-backed persistence
-    - DEFRA_SOURCE_URL (optional) — location for retrieving emission factor defaults
-
-### How Mentors Can “Drive” the Service
-The mentor can directly access the deployed URL using the documented API endpoints in the README.
-Admin operations require the private admin key to be sent as a Bearer token.
 
 ## 4. Building & Running the Service
 Running the program is simple:
@@ -95,14 +84,14 @@ From there, you can send the service API requests via `curl` or any tool of your
   }
 ```
 
-## 5. Key features
+## 4. Key features
 - Simple registration + API key model for clients
 - Per-event storage of transportation activity and aggregated footprint metrics (weekly/monthly)
 - Suggestions and analytics endpoints that provide tailored tips and peer comparisons
 - Pluggable backing store (in-memory for testing, MongoDB for persistence)
 - Admin endpoints for operators to inspect logs, clients, and clear data (protected by an operator API key)
 
-## 6. Client Overview
+## 5. Client Overview
 
 ### Clients:
 High level overview of possible clients likely to use our service: 
@@ -119,7 +108,7 @@ High level overview of possible clients likely to use our service:
 - Use case: schools and universities push student travel data (school-sponsored trips) and pull anonymized reports to measure and report on campus sustainability efforts.
 - Typical API calls mirror the Corporate dashboard flow: `POST /users/{id}/transit` and `GET /users/{id}/analytics`
 
-## 7. API Documentation (Client + Admin Endpoints)
+## 6. API Documentation (Client + Admin Endpoints)
 
 ### Client Endpoints
 
@@ -291,7 +280,7 @@ $ curl -X POST -H "Authorization: Bearer changeme_admin_key_please_replace" \
     http://localhost:8080/admin/emission-factors/load | jq
 ```
 
-## 8. Development Notes
+## 7. Development Notes
 Development Tools:
 - [cpp-httplib](https://github.com/yhirose/cpp-httplib): An easy RESTful API library for C++ developers
 - MongoDB: A document database for persistent storage of carbon footprint data
@@ -345,7 +334,7 @@ To run a coverage report on your tests, run
 As of the last time this codebase was modified, the coverage is as follows:
 ![Function (100%), Line (98.11%), Region (91.63%), Branch (79.23%)](assets/img/coverage.png "Coverage")
 
-## 9. Testing Overview
+## 8. Testing Overview
 
 ### Unit Tests
 - Validate correctness of individual methods and classes (e.g., TransitEvent, calculators).
@@ -532,7 +521,7 @@ All tests run automatically in GitHub Actions CI and must pass before merging in
     - Correct admin header; body ignored except for content type → loads DEFRA factors and returns count
         - Test: `AdminEmissionFactors.LoadDefra2024_ReturnsCount`
 
-## 10. Continuous Integration
+## 9. Continuous Integration
 
 This project uses GitHub Actions to automatically run tests, style checks, and static analysis on every pull request to the `main` branch.
 
@@ -585,7 +574,7 @@ These were removed, and the CI loop now enforces formatting via clang-format and
 ![Failure](assets/img/style_check_fail.png "Failure")
 ![Success](assets/img/style_check_success.png "Success")
 
-## 11. Static Analysis
+## 10. Static Analysis
 
 The service codebase was analyzed using an automated static-analysis workflow integrated into CI.  
 Initial runs of `.clang-tidy` surfaced tens of thousands of warnings due to an overly broad default ruleset that included style, modernization, and readability checks not relevant to bug detection.
@@ -611,7 +600,7 @@ make lint
 
 This ensures that regressions or newly introduced issues are caught before merging into `main`.
 
-## 12. Third-Party Code
+## 11. Third-Party Code
 
 This project relies on a small number of third-party libraries to implement HTTP routing, testing, and optional persistent storage. No third-party source code is modified, and all libraries maintain their original licenses.
 
@@ -658,13 +647,13 @@ Each dependency retains its own license:
 
 No modifications are made to these sources, and they are used strictly as external libraries.
 
-## 13. Project Management
+## 12. Project Management
 
 Project management and team task tracking were conducted through GitHub Issues, which is linked in this repository. Work was organized using per-iteration milestones, and progress was captured in issue threads and pull requests. All pull requests into the `main` branch followed a review workflow with required approvals, and commit messages were written to clearly describe the changes in each revision. Team contributions, authorship, and testing responsibilities are documented throughout the issue tracker and PR history.
 
 ---
 
-## 14. Tagging & Versioning
+## 13. Tagging & Versioning
 
 The `main` branch contains the complete, final submission for Iteration 2. All pull requests merged into `main` were reviewed by another team member, and branch protection rules ensured that:
 
@@ -675,7 +664,7 @@ Commit messages describe the purpose of the changes made in each pull request, p
 
 ---
 
-## 15. Change Log
+## 14. Change Log
 
 ### Implemented in This Iteration
 - Complete carbon emissions calculation engine using DEFRA 2024 conversion factors  
@@ -693,4 +682,4 @@ Commit messages describe the purpose of the changes made in each pull request, p
 These modifications improved overall system robustness, simplified deployment, and supported comprehensive test coverage while preserving the core functionality originally proposed.
 
 ----
-*Last updated December 4, 2025*
+*Last updated December 5, 2025*
