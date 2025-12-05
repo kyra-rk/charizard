@@ -532,143 +532,7 @@ All tests run automatically in GitHub Actions CI and must pass before merging in
     - Correct admin header; body ignored except for content type → loads DEFRA factors and returns count
         - Test: `AdminEmissionFactors.LoadDefra2024_ReturnsCount`
 
-## 10. End-to-End Testing (Manual or Automated)
-Although the service includes extensive unit, class, and API tests, the assignment requires documenting manual end-to-end tests that exercise the entire system: the client interacting with the deployed service, including authentication, persistence, analytics, and admin operations. The following tests are fully reproducible and cover all major functional flows.
-
----
-
-## E2E Test 1 — Full User Flow (Register → Transit → Footprint → Suggestions → Analytics)
-
-This test demonstrates the complete lifecycle of a typical client using the service.
-
-### Steps
-1. **Register a new client**
-   ```bash
-   curl -X POST "$BASE_URL/users/register" \
-     -H "Content-Type: application/json" \
-     -d '{"app_name":"e2e-test-app"}'
-   ```
-   Save the returned `user_id` and `api_key`.
-
-2. **Submit a valid transit event**
-   ```bash
-   curl -X POST "$BASE_URL/users/$USER_ID/transit" \
-     -H "Content-Type: application/json" \
-     -H "X-API-Key: $API_KEY" \
-     -d '{"mode":"car","distance_km":10}'
-   ```
-
-3. **Retrieve lifetime footprint**
-   ```bash
-   curl -H "X-API-Key: $API_KEY" \
-     "$BASE_URL/users/$USER_ID/lifetime-footprint"
-   ```
-
-4. **Retrieve suggestions**
-   ```bash
-   curl -H "X-API-Key: $API_KEY" \
-     "$BASE_URL/users/$USER_ID/suggestions"
-   ```
-
-5. **Retrieve analytics**
-   ```bash
-   curl -H "X-API-Key: $API_KEY" \
-     "$BASE_URL/users/$USER_ID/analytics"
-   ```
-
-### Expected Results
-- All calls return **200/201** responses.
-- Lifetime footprint is **non-zero** after logging a transit event.
-- Suggestions reflect the user’s weekly CO₂ level.
-- Analytics returns:
-  - weekly total  
-  - peer weekly average  
-  - `above_peer_avg` boolean  
-
----
-
-## E2E Test 2 — Multiple Clients & Peer Analytics
-
-This test validates correct isolation of client data and accurate cross-user analytics.
-
-### Steps
-1. Register **Client A**, save `user_id_A`, `api_key_A`.  
-2. Register **Client B**, save `user_id_B`, `api_key_B`.  
-3. Log transit events for each client:
-   ```bash
-   # Client A
-   curl -X POST "$BASE_URL/users/$A/transit" -H "X-API-Key: $KEY_A" \
-     -H "Content-Type: application/json" \
-     -d '{"mode":"car","distance_km":20}'
-
-   # Client B
-   curl -X POST "$BASE_URL/users/$B/transit" -H "X-API-Key: $KEY_B" \
-     -H "Content-Type: application/json" \
-     -d '{"mode":"train","distance_km":5}'
-   ```
-
-4. Query analytics for each client:
-   ```bash
-   curl -H "X-API-Key: $KEY_A" "$BASE_URL/users/$A/analytics"
-   curl -H "X-API-Key: $KEY_B" "$BASE_URL/users/$B/analytics"
-   ```
-
-### Expected Results
-- Clients cannot access each other’s data (401 Unauthorized).
-- Analytics for both clients report:
-  - correct weekly emissions  
-  - identical peer averages (computed across all clients)  
-  - `above_peer_avg` differs when their footprint differs  
-
----
-
-## E2E Test 3 — Admin Operations
-
-This test verifies admin authentication, log visibility, client inspection, and database clearing.
-
-### Steps
-1. **List logs**
-   ```bash
-   curl -H "Authorization: Bearer $ADMIN_API_KEY" \
-     "$BASE_URL/admin/logs"
-   ```
-
-2. **Trigger activity**  
-   Register a client and submit one or more events.
-
-3. **List clients**
-   ```bash
-   curl -H "Authorization: Bearer $ADMIN_API_KEY" \
-     "$BASE_URL/admin/clients"
-   ```
-
-4. **View client data**
-   ```bash
-   curl -H "Authorization: Bearer $ADMIN_API_KEY" \
-     "$BASE_URL/admin/clients/$USER_ID/data"
-   ```
-
-5. **Clear logs or the entire DB**
-   ```bash
-   curl -X DELETE \
-     -H "Authorization: Bearer $ADMIN_API_KEY" \
-     "$BASE_URL/admin/logs"
-
-   curl -H "Authorization: Bearer $ADMIN_API_KEY" \
-     "$BASE_URL/admin/clear-db"
-   ```
-
-### Expected Results
-- Missing or invalid admin token → **401 Unauthorized**.
-- GET `/admin/logs` returns accumulated request logs.
-- GET `/admin/clients` lists all clients with stored events.
-- GET `/admin/clients/<id>/data` returns that client’s event history.
-- Clearing logs → subsequent log queries return an empty array.
-- Clearing DB → `/admin/clients` shows no active clients.
-
----
-
-## 11. Continuous Integration
+## 10. Continuous Integration
 
 This project uses GitHub Actions to automatically run tests, style checks, and static analysis on every pull request to the `main` branch.
 
@@ -718,7 +582,7 @@ Our CI pipeline originally ran strict readability and checkstyle rules that crea
 
 These were removed, and the CI loop now enforces formatting via clang-format and minimal style/lint checks. All style errors were fixed, and a clean CI report is included below.
 
-## 12. Static Analysis
+## 11. Static Analysis
 
 The service codebase was analyzed using an automated static-analysis workflow integrated into CI.  
 Initial runs of `.clang-tidy` surfaced tens of thousands of warnings due to an overly broad default ruleset that included style, modernization, and readability checks not relevant to bug detection.
@@ -742,7 +606,7 @@ make lint
 
 This ensures that regressions or newly introduced issues are caught before merging into `main`.
 
-## 13. Third-Party Code
+## 12. Third-Party Code
 
 This project relies on a small number of third-party libraries to implement HTTP routing, testing, and optional persistent storage. No third-party source code is modified, and all libraries maintain their original licenses.
 
@@ -789,13 +653,13 @@ Each dependency retains its own license:
 
 No modifications are made to these sources, and they are used strictly as external libraries.
 
-## 14. Project Management
+## 13. Project Management
 
 Project management and team task tracking were conducted through GitHub Issues, which is linked in this repository. Work was organized using per-iteration milestones, and progress was captured in issue threads and pull requests. All pull requests into the `main` branch followed a review workflow with required approvals, and commit messages were written to clearly describe the changes in each revision. Team contributions, authorship, and testing responsibilities are documented throughout the issue tracker and PR history.
 
 ---
 
-## 15. Tagging & Versioning
+## 14. Tagging & Versioning
 
 The `main` branch contains the complete, final submission for Iteration 2. All pull requests merged into `main` were reviewed by another team member, and branch protection rules ensured that:
 
@@ -812,7 +676,7 @@ v2.0-iteration-submission
 
 ---
 
-## 16. Change Log
+## 15. Change Log
 
 ### Implemented in This Iteration
 - Complete carbon emissions calculation engine using DEFRA 2024 conversion factors  
@@ -828,7 +692,6 @@ v2.0-iteration-submission
 
 ### Reasoning
 These modifications improved overall system robustness, simplified deployment, and supported comprehensive test coverage while preserving the core functionality originally proposed.
-
 
 ----
 *Last updated December 4, 2025*
