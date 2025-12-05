@@ -59,11 +59,16 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 
 # ----- TARGETS -----
-add_executable(charizard_api
+set(CHARIZARD_API_SOURCES
   src/main.cpp
-  src/mongo_store.cpp
   $<TARGET_OBJECTS:charizard_api_obj>
 )
+
+if(CHARIZARD_WITH_MONGO)
+  list(APPEND CHARIZARD_API_SOURCES src/mongo_store.cpp)
+endif()
+
+add_executable(charizard_api ${CHARIZARD_API_SOURCES})
 
 target_include_directories(charizard_api PRIVATE
   include
