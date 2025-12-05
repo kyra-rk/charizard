@@ -1,0 +1,41 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+!README.md
+
+# Coverage reports
+coverage/
+coverage_html/
+*.profraw
+*.gcda
+*.gcno
+
+# CI/CD
+.github/
+
+# Local scripts
+scripts/
+
+# macOS
+.DS_Store
+
+# Temporary files
+*.tmp
+*.log
+
