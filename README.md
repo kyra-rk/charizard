@@ -60,19 +60,6 @@ When a transit event is recorded, the service:
 
 Source: [UK Government Greenhouse Gas Reporting Conversion Factors 2024](https://www.gov.uk/guidance/greenhouse-gas-reporting-conversion-factors-2024)
 
-## 3. Deployment
-(Add: how to deploy to GCP, how to redeploy, how mentor can “drive” the service, required env vars, differences in local vs cloud.)
-
-### Required Environment Variables
-Cloud Run deployment requires setting:
-    - ADMIN_API_KEY — operator key for admin endpoints
-    - MONGO_URI (optional) — presence triggers MongoDB-backed persistence
-    - DEFRA_SOURCE_URL (optional) — location for retrieving emission factor defaults
-
-### How Mentors Can “Drive” the Service
-The mentor can directly access the deployed URL using the documented API endpoints in the README.
-Admin operations require the private admin key to be sent as a Bearer token.
-
 ## 4. Building & Running the Service
 Running the program is simple:
 ```
