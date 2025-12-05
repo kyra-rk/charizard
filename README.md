@@ -1,4 +1,6 @@
 # Carbon Estimator
+
+## 1. Overview 
 An API service that accurately estimates a user's carbon footprint. Clients can interface with the service through several API methods to log trips and retrieve computed carbon footprint metrics and recommendations.
 
 The server stores and aggregates logged data over configurable windows (week, month) to compute carbon footprint metrics and detect trends (for example, an increase in footprint if a user switches from subway to taxis). Clients can compare their footprint against global or peer averages while preserving anonymity.
@@ -9,7 +11,27 @@ Demo Client App: https://github.com/RhysTalley/charizard_client_app
 
 Hosted Base URL: https://charizard-carbon-estimator-901787757680.us-east1.run.app/
 
-## Emission Factors Architecture
+## 2. Architecture & Data Models 
+
+### High Level Architecture 
+The service follows a modular architecture with three major components:
+1. HTTP Layer (cpp-httplib)
+- Handles routing, request parsing, authentication, and serialization of responses.
+- Provides separate route groups for client endpoints and admin endpoints.
+
+2. Service Layer
+- Implements business logic for registration, transit event ingestion, analytics, footprint calculation, suggestions, and admin operations.
+- Uses DEFRA 2024 emission factors preloaded into memory or fetched from MongoDB.
+
+3. Data Layer (Pluggable Store)
+- Two store implementations exist:
+    - In-memory store for local development & testing.
+    - MongoDB-backed store for persistence in cloud deployments.
+- Stores API keys (hashed), transit events, logs, and emission factors.
+
+All components interact through clean interfaces to allow unit, API, integration, and class-level testing without modifying runtime behavior.
+
+### Emission Factors Architecture
 
 The service calculates CO2 emissions for transit events using **DEFRA 2024 UK Government greenhouse gas conversion factors**. Rather than calling external APIs, factors are loaded from online sources and **persisted locally** (in-memory or MongoDB) for repeated use.
 
@@ -38,7 +60,20 @@ When a transit event is recorded, the service:
 
 Source: [UK Government Greenhouse Gas Reporting Conversion Factors 2024](https://www.gov.uk/guidance/greenhouse-gas-reporting-conversion-factors-2024)
 
-## Building & Running the Service
+## 3. Deployment
+(Add: how to deploy to GCP, how to redeploy, how mentor can “drive” the service, required env vars, differences in local vs cloud.)
+
+### Required Environment Variables
+Cloud Run deployment requires setting:
+    - ADMIN_API_KEY — operator key for admin endpoints
+    - MONGO_URI (optional) — presence triggers MongoDB-backed persistence
+    - DEFRA_SOURCE_URL (optional) — location for retrieving emission factor defaults
+
+### How Mentors Can “Drive” the Service
+The mentor can directly access the deployed URL using the documented API endpoints in the README.
+Admin operations require the private admin key to be sent as a Bearer token.
+
+## 4. Building & Running the Service
 Running the program is simple:
 ```
   $ brew bundle
@@ -60,14 +95,16 @@ From there, you can send the service API requests via `curl` or any tool of your
   }
 ```
 
-## Key features
+## 5. Key features
 - Simple registration + API key model for clients
 - Per-event storage of transportation activity and aggregated footprint metrics (weekly/monthly)
 - Suggestions and analytics endpoints that provide tailored tips and peer comparisons
 - Pluggable backing store (in-memory for testing, MongoDB for persistence)
 - Admin endpoints for operators to inspect logs, clients, and clear data (protected by an operator API key)
 
-## Clients
+## 6. Client Overview
+
+### Clients:
 High level overview of possible clients likely to use our service: 
 
 1) Personal Transportation Tracker App
@@ -82,7 +119,9 @@ High level overview of possible clients likely to use our service:
 - Use case: schools and universities push student travel data (school-sponsored trips) and pull anonymized reports to measure and report on campus sustainability efforts.
 - Typical API calls mirror the Corporate dashboard flow: `POST /users/{id}/transit` and `GET /users/{id}/analytics`
 
-## Client Endpoints
+## 7. API Documentation (Client + Admin Endpoints)
+
+### Client Endpoints
 
 This section documents the operational entry points that clients (apps) and developers will use. It lists each route, required authentication, expected inputs and outputs, visible side-effects, and common status / error codes. Note the service enforces a simple registration + API key model: you must register as a client to receive a `user_id` and `api_key` before calling protected client endpoints.
 
@@ -240,19 +279,19 @@ $ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://local
 $ curl -H "Authorization: Bearer changeme_admin_key_please_replace" http://localhost:8080/admin/clear-db
 ```
 
-# List stored factors (returns persisted factors, or DEFRA defaults if store is empty)
+### List stored factors (returns persisted factors, or DEFRA defaults if store is empty)
 ```bash
 $ curl -H "Authorization: Bearer changeme_admin_key_please_replace" \
     http://localhost:8080/admin/emission-factors | jq
 ```
 
-# Load and persist DEFRA 2024 factors (loads hardcoded defaults into the store)
+### Load and persist DEFRA 2024 factors (loads hardcoded defaults into the store)
 ```bash
 $ curl -X POST -H "Authorization: Bearer changeme_admin_key_please_replace" \
     http://localhost:8080/admin/emission-factors/load | jq
 ```
 
-## Development Notes
+## 8. Development Notes
 Development Tools:
 - [cpp-httplib](https://github.com/yhirose/cpp-httplib): An easy RESTful API library for C++ developers
 - MongoDB: A document database for persistent storage of carbon footprint data
@@ -306,7 +345,330 @@ To run a coverage report on your tests, run
 As of the last time this codebase was modified, the coverage is as follows:
 ![Function (100%), Line (98.11%), Region (91.63%), Branch (79.23%)](assets/img/coverage.png "Coverage")
 
-## Continuous Integration
+## 9. Testing Overview
+
+### Unit Tests
+- Validate correctness of individual methods and classes (e.g., TransitEvent, calculators).
+- Cover all valid/invalid equivalence partitions for inputs.
+
+### API Tests
+- Exercise the full HTTP layer, including routing, serialization, auth, and error handling.
+- Ensure edge cases (bad JSON, missing fields, invalid paths) behave correctly.
+
+### Class Tests
+- Validate multi-method interactions within a single class.
+- Example: verifying consistency between event ingestion & footprint calculator caching.
+
+### Internal Integration Tests
+- Ensure interactions between service-layer components work end-to-end.
+- Example: creating events → storing them → computing analytics.
+
+### External Integration Tests
+- Validate behavior with MongoDB when enabled.
+- Confirm persistence, retrieval, and deletion semantics.
+
+### Test Automation
+All tests run automatically in GitHub Actions CI and must pass before merging into main.
+
+### Testing Specifications:
+
+### `POST /users/register`
+**Partitions**
+- Body missing / empty
+    - Test: `ApiRegister.Failure_MissingBody`
+- Body not valid JSON
+    - Test: `ApiRegister.Failure_InvalidJson`
+- Body valid JSON but app_name missing
+    - Test: `ApiRegister.Failure_MissingAppName`
+- Body valid JSON but app_name wrong type
+    - Test: `ApiRegister.Failure_NonStringAppName`
+- Body valid JSON and app_name empty string (boundary)
+    - Test: `ApiRegister.Failure_EmptyAppName`
+- Body valid, app_name non-empty string
+    - Tests: `ApiRegister.Success_MinimalJson`, `ApiRegister.Success_IgnoresExtraFields`
+- Content-type variants
+    - Test: `ApiRegister.Success_AcceptsPlainContentType`
+
+### `POST /users/{user_id}/transit`
+**Partitions**
+- Path invalid
+    - Test: `ApiTransit.BadPath_InvalidUserSegment`
+    - No Authorization header → 401
+        - Test: `ApiTransit.Unauthorized_MissingAuthHeader`
+    - Wrong or malformed key → 401
+        - Test: `ApiTransit.Unauthorized_WrongApiKey`
+    - User not registered in store → 401 (even with an “ok” header)
+        - Test: `ApiTransit.Unauthorized_UserNotRegistered`
+    - Correct header & user exists → 201
+        - Test: All success cases.
+- Body invalid / malformed
+    - Non-JSON body → invalid_json (400)
+        - Test: `ApiTransit.Failure_InvalidJson`
+    - JSON object missing mode → missing_fields (400)
+        - Test: `ApiTransit.Failure_MissingModeField`
+    - JSON object missing distance_km → missing_fields (400)
+        - Test: `ApiTransit.Failure_MissingDistanceField`
+- Type errors
+    - mode not a string → invalid JSON payload (catch json exception)
+        - Test: `ApiTransit.Failure_ModeWrongType`
+    - distance_km not numeric → invalid JSON payload
+        - Test: `ApiTransit.Failure_DistanceWrongType`
+- Domain validation (via TransitEvent) 
+    - Invalid mode (not one of car/bus/taxi/...) → error: invalid mode 400
+        - Test: `ApiTransit.Failure_InvalidMode_PropagatesMessage`
+    - Distance ≤ 0 – you test this at the TransitEvent level (see TransitEventTest), and the API route’s generic runtime_error → 400 path is exercised by the invalid-mode test as well.
+- Happy paths / boundary on ts
+    - Valid JSON, mode + distance_km, no ts → default to now_epoch()
+        - Test: `ApiTransit.Success_ValidJson_DefaultTs`
+    - Same but with explicit ts (boundary: “ts optional; when present, must be int64”)
+        - Test: `ApiTransit.Success_ValidJson_ExplicitTs`
+
+### `GET /users/{user_id}/lifetime-footprint`
+**Partitions**
+- Path invalid → 404 bad_path
+    - Test: `ApiFootprint.Failure_BadPath`
+- Auth
+    - Missing header → 401
+        - Test: `ApiFootprint.Unauthorized_MissingAuthHeader`
+    - Wrong key → 401
+        - Test: `ApiFootprint.Unauthorized_WrongApiKey`
+    - Correct key & user exists → 200
+        - All success tests.
+- Events dataset
+    - No events for user → footprint = 0
+        - Test: `ApiFootprint.Success_NoEvents_ZeroFootprint`
+    - Some events (car, train, etc.) → compute emissions
+        - Tests: `ApiFootprint.Success_WithCarEvents_UsesCalculator`, `ApiFootprint.Success_WithTrain_UsesDefraFactor`
+- Cache behavior
+    - First call: compute & store
+    - Second call: hit cache
+        - Test: `ApiFootprint.Success_CacheHit`
+
+### `GET /users/{user_id}/suggestions`
+**Partitions**
+- Path invalid → 404 bad_path
+    - Test: ApiSuggestions.Failure_BadPath
+- Auth
+    - Missing / wrong → 401
+        - Test: `ApiSuggestions.Unauthorized_MissingAuthHeader`
+- Weekly CO₂ bucket (branch at 20.0)
+    - `s.week_kg_co2 > 20.0` → “high impact” suggestions (two messages)
+        - Test: `ApiSuggestions.HighFootprint_ReturnsHighImpactSuggestions`
+    - `s.week_kg_co2 <= 20.0` → “low impact / keep it up” suggestion
+        - Test: `ApiSuggestions.LowFootprint_ReturnsLowImpactMessage`
+
+### `GET /users/{user_id}/analytics`
+**Partitions**
+- Path invalid → 404
+    - Test: ApiAnalytics.Failure_BadPath
+- Auth partitions (like others)
+    - Missing / wrong → 401
+        - Tests: `ApiAnalytics.Unauthorized_MissingAuthHeader`, `ApiAnalytics.Unauthorized_WrongApiKey`
+    - Correct → 200
+        - Test: `ApiAnalytics.Success_ReturnsWeeklyAndPeerStats`
+- Analytics values
+    - Branch: `above_peer_avg = (user_week > peer_avg)`
+
+### `GET and DELETE /admin/logs`
+- Auth:
+    - Env var not set → always unauthorized
+        - Test: `AdminAuth.Unauthorized_NoAdminKeyEnvVar`
+    - Env var set but header missing → 401
+        - Test: `AdminLogs.Unauthorized_GetLogs`
+    - Header value without "Bearer " prefix → 401
+        - Test: `AdminAuth.Unauthorized_MissingBearerPrefix`
+    - Header with "Bearer WRONG" → 401
+        - Test: `AdminLogs.Unauthorized_DeleteLogs`
+    - Correct "Bearer super-secret" → 200
+        - All happy tests.
+- Log volume (GET)
+    - n <= 1000 logs → returns all
+    - n > 1000 → returns last 1000 only
+        - Test: `AdminLogs.Logs_ExceedLimit_ReturnsLastN` 
+- DELETE /admin/logs
+    - With logs present → clears and subsequent GET shows empty array
+        - Test: `AdminLogs.DeleteLogs_ClearsAll`
+
+### `/admin/clients` and `/admin/clients/{id}/data`
+- Auth
+    - Missing/wrong header → 401
+        - Tests: `AdminAuth...`, `AdminLogs.Unauthorized_GetLogs`, etc.
+    - Correct header → 200.
+- GET /admin/clients
+    - No active clients (no events) → empty array
+    - At least one client with events → array includes "demo"
+        - Test: `AdminClients.Clients_ListContainsDemoAfterTransit`
+- GET /admin/clients/{id}/data
+    - Path invalid (regex failure) → 404 bad_path
+    - id exists and has events → non-empty event array
+        - Tests: `AdminClients.ClientData_ReturnsUserTransitEvents_Count`, `AdminClients.ClientData_ReturnsUserTransitEvents_Content`
+    - id does not exist → empty array
+        - Test: `AdminClients.ClientData_UnknownUser_ReturnsEmptyArray`
+
+### `/admin/clear-db-events` and `/admin/clear-db`
+- Auth
+    - Wrong admin header → 401
+        - Testss: `AdminDb.Unauthorized_ClearDbEvents`, `AdminDb.Unauthorized_ClearDb`
+    - Correct header → 200 and status "ok"
+- State effects
+    - ClearDbEvents after seeding events:
+        - Before: /admin/clients non-empty
+        - After: /admin/clients empty
+        - Test: `AdminDb.ClearDbEvents_RemovesOnlyEvents_AfterwardsClientsEmpty`
+    - ClearDb after events + logs:
+        - After: /admin/clients empty and /admin/logs empty
+        - Test: `AdminDb.ClearDb_RemovesEverything_ClientsEmpty`
+
+### `/admin/emission-factors` and `/admin/emission-factors/load`
+- Auth
+    - Wrong / missing admin → 401
+    - Correct header → 200.
+- GET /admin/emission-factors
+    - Store has no persisted emission factors → returns DEFRA defaults from loader
+        - Test: `AdminEmissionFactors.GetDefaults_ReturnsBasicDefaults`
+    - Store has persisted factors → returns persisted set
+        - Test: `AdminEmissionFactors.LoadDefra2024_ReturnsCount`
+- POST /admin/emission-factors/load
+    - Correct admin header; body ignored except for content type → loads DEFRA factors and returns count
+        - Test: `AdminEmissionFactors.LoadDefra2024_ReturnsCount`
+
+## 10. End-to-End Testing (Manual or Automated)
+Although the service includes extensive unit, class, and API tests, the assignment requires documenting manual end-to-end tests that exercise the entire system: the client interacting with the deployed service, including authentication, persistence, analytics, and admin operations. The following tests are fully reproducible and cover all major functional flows.
+
+---
+
+## E2E Test 1 — Full User Flow (Register → Transit → Footprint → Suggestions → Analytics)
+
+This test demonstrates the complete lifecycle of a typical client using the service.
+
+### Steps
+1. **Register a new client**
+   ```bash
+   curl -X POST "$BASE_URL/users/register" \
+     -H "Content-Type: application/json" \
+     -d '{"app_name":"e2e-test-app"}'
+   ```
+   Save the returned `user_id` and `api_key`.
+
+2. **Submit a valid transit event**
+   ```bash
+   curl -X POST "$BASE_URL/users/$USER_ID/transit" \
+     -H "Content-Type: application/json" \
+     -H "X-API-Key: $API_KEY" \
+     -d '{"mode":"car","distance_km":10}'
+   ```
+
+3. **Retrieve lifetime footprint**
+   ```bash
+   curl -H "X-API-Key: $API_KEY" \
+     "$BASE_URL/users/$USER_ID/lifetime-footprint"
+   ```
+
+4. **Retrieve suggestions**
+   ```bash
+   curl -H "X-API-Key: $API_KEY" \
+     "$BASE_URL/users/$USER_ID/suggestions"
+   ```
+
+5. **Retrieve analytics**
+   ```bash
+   curl -H "X-API-Key: $API_KEY" \
+     "$BASE_URL/users/$USER_ID/analytics"
+   ```
+
+### Expected Results
+- All calls return **200/201** responses.
+- Lifetime footprint is **non-zero** after logging a transit event.
+- Suggestions reflect the user’s weekly CO₂ level.
+- Analytics returns:
+  - weekly total  
+  - peer weekly average  
+  - `above_peer_avg` boolean  
+
+---
+
+## E2E Test 2 — Multiple Clients & Peer Analytics
+
+This test validates correct isolation of client data and accurate cross-user analytics.
+
+### Steps
+1. Register **Client A**, save `user_id_A`, `api_key_A`.  
+2. Register **Client B**, save `user_id_B`, `api_key_B`.  
+3. Log transit events for each client:
+   ```bash
+   # Client A
+   curl -X POST "$BASE_URL/users/$A/transit" -H "X-API-Key: $KEY_A" \
+     -H "Content-Type: application/json" \
+     -d '{"mode":"car","distance_km":20}'
+
+   # Client B
+   curl -X POST "$BASE_URL/users/$B/transit" -H "X-API-Key: $KEY_B" \
+     -H "Content-Type: application/json" \
+     -d '{"mode":"train","distance_km":5}'
+   ```
+
+4. Query analytics for each client:
+   ```bash
+   curl -H "X-API-Key: $KEY_A" "$BASE_URL/users/$A/analytics"
+   curl -H "X-API-Key: $KEY_B" "$BASE_URL/users/$B/analytics"
+   ```
+
+### Expected Results
+- Clients cannot access each other’s data (401 Unauthorized).
+- Analytics for both clients report:
+  - correct weekly emissions  
+  - identical peer averages (computed across all clients)  
+  - `above_peer_avg` differs when their footprint differs  
+
+---
+
+## E2E Test 3 — Admin Operations
+
+This test verifies admin authentication, log visibility, client inspection, and database clearing.
+
+### Steps
+1. **List logs**
+   ```bash
+   curl -H "Authorization: Bearer $ADMIN_API_KEY" \
+     "$BASE_URL/admin/logs"
+   ```
+
+2. **Trigger activity**  
+   Register a client and submit one or more events.
+
+3. **List clients**
+   ```bash
+   curl -H "Authorization: Bearer $ADMIN_API_KEY" \
+     "$BASE_URL/admin/clients"
+   ```
+
+4. **View client data**
+   ```bash
+   curl -H "Authorization: Bearer $ADMIN_API_KEY" \
+     "$BASE_URL/admin/clients/$USER_ID/data"
+   ```
+
+5. **Clear logs or the entire DB**
+   ```bash
+   curl -X DELETE \
+     -H "Authorization: Bearer $ADMIN_API_KEY" \
+     "$BASE_URL/admin/logs"
+
+   curl -H "Authorization: Bearer $ADMIN_API_KEY" \
+     "$BASE_URL/admin/clear-db"
+   ```
+
+### Expected Results
+- Missing or invalid admin token → **401 Unauthorized**.
+- GET `/admin/logs` returns accumulated request logs.
+- GET `/admin/clients` lists all clients with stored events.
+- GET `/admin/clients/<id>/data` returns that client’s event history.
+- Clearing logs → subsequent log queries return an empty array.
+- Clearing DB → `/admin/clients` shows no active clients.
+
+---
+
+## 11. Continuous Integration
 
 This project uses GitHub Actions to automatically run tests, style checks, and static analysis on every pull request to the `main` branch.
 
@@ -315,6 +677,7 @@ This project uses GitHub Actions to automatically run tests, style checks, and s
 - **All API/integration tests** — automatically run as part of `make test`
 - **Style checking** — via `make format-check` to ensure code follows the project's formatting standards
 - **Static analysis** — via `make lint` to catch potential code issues
+- **Test coverage** — via `make coverage`, which builds with coverage instrumentation and runs the test suite to generate coverage data
 
 The CI workflow is defined in `.github/workflows/ci.yml` and runs on macOS (matching our primary development environment).
 
@@ -355,5 +718,117 @@ Our CI pipeline originally ran strict readability and checkstyle rules that crea
 
 These were removed, and the CI loop now enforces formatting via clang-format and minimal style/lint checks. All style errors were fixed, and a clean CI report is included below.
 
+## 12. Static Analysis
+
+The service codebase was analyzed using an automated static-analysis workflow integrated into CI.  
+Initial runs of `.clang-tidy` surfaced tens of thousands of warnings due to an overly broad default ruleset that included style, modernization, and readability checks not relevant to bug detection.
+
+To focus on true defects, the ruleset was narrowed to:
+
+- `clang-analyzer-*`  
+- `bugprone-*`
+
+After applying this targeted configuration:
+
+- All actionable issues were fixed in the service code.
+- Subsequent CI runs reported **no remaining static-analysis defects**.
+- Before/after CI logs documenting these improvements are included in the repository.
+
+Static analysis runs automatically in GitHub Actions via:
+
+```bash
+make lint
+```
+
+This ensures that regressions or newly introduced issues are caught before merging into `main`.
+
+## 13. Third-Party Code
+
+This project relies on a small number of third-party libraries to implement HTTP routing, testing, and optional persistent storage. No third-party source code is modified, and all libraries maintain their original licenses.
+
+## Dependencies:
+
+### **cpp-httplib**
+A lightweight, header-only HTTP server and client library used to implement all API routing and HTTP request/response handling.
+
+- **Location:** `third_party/cpp-httplib/` 
+- **Source:** https://github.com/yhirose/cpp-httplib
+- **Usage:**  
+  - Core HTTP server for all client and admin endpoints  
+  - JSON parsing for request bodies and responses (through its built-in JSON support)
+
+---
+
+### **GoogleTest**
+The unit test framework used for all unit, API, class, and integration tests.
+
+- **Installation:** via package manager (not vendored in the repo)
+- **Usage:**  
+  - Provides assertions, test runners, and fixtures  
+  - Used exclusively in the test suite (not in production code)
+
+---
+
+### **MongoDB C++ Driver** 
+The official C++ driver used to connect to a MongoDB instance when running in persistent-storage mode.
+
+- **Installation:** via package manager (not checked into the repository)
+- **Usage:**  
+  - Persists transit events, API keys, logs, and emission factors  
+  - Only active when the `MONGO_URI` environment variable is provided
+
+---
+
+## Licensing
+
+Each dependency retains its own license:
+
+- cpp-httplib — MIT License  
+- GoogleTest — BSD-3-Clause License  
+- MongoDB C++ Driver — Apache 2.0 License  
+
+No modifications are made to these sources, and they are used strictly as external libraries.
+
+## 14. Project Management
+
+Project management and team task tracking were conducted through GitHub Issues, which is linked in this repository. Work was organized using per-iteration milestones, and progress was captured in issue threads and pull requests. All pull requests into the `main` branch followed a review workflow with required approvals, and commit messages were written to clearly describe the changes in each revision. Team contributions, authorship, and testing responsibilities are documented throughout the issue tracker and PR history.
+
+---
+
+## 15. Tagging & Versioning
+
+The `main` branch contains the complete, final submission for Iteration 2. All pull requests merged into `main` were reviewed by another team member, and branch protection rules ensured that:
+
+- All CI checks passed before merging  
+- At least one approving review was required  
+
+Commit messages describe the purpose of the changes made in each pull request, providing a clear and traceable project history.
+
+The codebase for this iteration is tagged as:
+
+```
+v2.0-iteration-submission
+```
+
+---
+
+## 16. Change Log
+
+### Implemented in This Iteration
+- Complete carbon emissions calculation engine using DEFRA 2024 conversion factors  
+- In-memory and MongoDB-backed persistent storage layers  
+- Full client API suite (`register`, `transit`, `lifetime-footprint`, `suggestions`, `analytics`)  
+- Admin interface for logs, clients, and database management  
+- Test suite achieving approximately 80% branch coverage  
+- Automated CI pipeline including style checks, linting, and static analysis  
+
+### Modified or Removed from Proposal
+- External API calls for emission factors were removed in favor of bundled DEFRA data for stability  
+- Some planned advanced analytics features were simplified to ensure correctness, reliability, and testability  
+
+### Reasoning
+These modifications improved overall system robustness, simplified deployment, and supported comprehensive test coverage while preserving the core functionality originally proposed.
+
+
 ----
-*Last updated November 23, 2025*
+*Last updated December 4, 2025*
