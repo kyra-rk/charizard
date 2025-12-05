@@ -356,7 +356,166 @@ Our CI pipeline originally ran strict readability and checkstyle rules that crea
 
 These were removed, and the CI loop now enforces formatting via clang-format and minimal style/lint checks. All style errors were fixed, and a clean CI report is included below.
 
+## Testing Specifics
+### `POST /users/register`
+**Partitions**
+- Body missing / empty
+    - Test: `ApiRegister.Failure_MissingBody`
+- Body not valid JSON
+    - Test: `ApiRegister.Failure_InvalidJson`
+- Body valid JSON but app_name missing
+    - Test: `ApiRegister.Failure_MissingAppName`
+- Body valid JSON but app_name wrong type
+    - Test: `ApiRegister.Failure_NonStringAppName`
+- Body valid JSON and app_name empty string (boundary)
+    - Test: `ApiRegister.Failure_EmptyAppName`
+- Body valid, app_name non-empty string
+    - Tests: `ApiRegister.Success_MinimalJson`, `ApiRegister.Success_IgnoresExtraFields`
+- Content-type variants
+    - Test: `ApiRegister.Success_AcceptsPlainContentType`
 
+### `POST /users/{user_id}/transit`
+**Partitions**
+- Path invalid
+    - Test: `ApiTransit.BadPath_InvalidUserSegment`
+    - No Authorization header → 401
+        - Test: `ApiTransit.Unauthorized_MissingAuthHeader`
+    - Wrong or malformed key → 401
+        - Test: `ApiTransit.Unauthorized_WrongApiKey`
+    - User not registered in store → 401 (even with an “ok” header)
+        - Test: `ApiTransit.Unauthorized_UserNotRegistered`
+    - Correct header & user exists → 201
+        - Test: All success cases.
+- Body invalid / malformed
+    - Non-JSON body → invalid_json (400)
+        - Test: `ApiTransit.Failure_InvalidJson`
+    - JSON object missing mode → missing_fields (400)
+        - Test: `ApiTransit.Failure_MissingModeField`
+    - JSON object missing distance_km → missing_fields (400)
+        - Test: `ApiTransit.Failure_MissingDistanceField`
+- Type errors
+    - mode not a string → invalid JSON payload (catch json exception)
+        - Test: `ApiTransit.Failure_ModeWrongType`
+    - distance_km not numeric → invalid JSON payload
+        - Test: `ApiTransit.Failure_DistanceWrongType`
+- Domain validation (via TransitEvent) 
+    - Invalid mode (not one of car/bus/taxi/...) → error: invalid mode 400
+        - Test: `ApiTransit.Failure_InvalidMode_PropagatesMessage`
+    - Distance ≤ 0 – you test this at the TransitEvent level (see TransitEventTest), and the API route’s generic runtime_error → 400 path is exercised by the invalid-mode test as well.
+- Happy paths / boundary on ts
+    - Valid JSON, mode + distance_km, no ts → default to now_epoch()
+        - Test: `ApiTransit.Success_ValidJson_DefaultTs`
+    - Same but with explicit ts (boundary: “ts optional; when present, must be int64”)
+        - Test: `ApiTransit.Success_ValidJson_ExplicitTs`
+
+### `GET /users/{user_id}/lifetime-footprint`
+**Partitions**
+- Path invalid → 404 bad_path
+    - Test: `ApiFootprint.Failure_BadPath`
+- Auth
+    - Missing header → 401
+        - Test: `ApiFootprint.Unauthorized_MissingAuthHeader`
+    - Wrong key → 401
+        - Test: `ApiFootprint.Unauthorized_WrongApiKey`
+    - Correct key & user exists → 200
+        - All success tests.
+- Events dataset
+    - No events for user → footprint = 0
+        - Test: `ApiFootprint.Success_NoEvents_ZeroFootprint`
+    - Some events (car, train, etc.) → compute emissions
+        - Tests: `ApiFootprint.Success_WithCarEvents_UsesCalculator`, `ApiFootprint.Success_WithTrain_UsesDefraFactor`
+- Cache behavior
+    - First call: compute & store
+    - Second call: hit cache
+        - Test: `ApiFootprint.Success_CacheHit`
+
+### `GET /users/{user_id}/suggestions`
+**Partitions**
+- Path invalid → 404 bad_path
+    - Test: ApiSuggestions.Failure_BadPath
+- Auth
+    - Missing / wrong → 401
+        - Test: `ApiSuggestions.Unauthorized_MissingAuthHeader`
+- Weekly CO₂ bucket (branch at 20.0)
+    - `s.week_kg_co2 > 20.0` → “high impact” suggestions (two messages)
+        - Test: `ApiSuggestions.HighFootprint_ReturnsHighImpactSuggestions`
+    - `s.week_kg_co2 <= 20.0` → “low impact / keep it up” suggestion
+        - Test: `ApiSuggestions.LowFootprint_ReturnsLowImpactMessage`
+
+### `GET /users/{user_id}/analytics`
+**Partitions**
+- Path invalid → 404
+    - Test: ApiAnalytics.Failure_BadPath
+- Auth partitions (like others)
+    - Missing / wrong → 401
+        - Tests: `ApiAnalytics.Unauthorized_MissingAuthHeader`, `ApiAnalytics.Unauthorized_WrongApiKey`
+    - Correct → 200
+        - Test: `ApiAnalytics.Success_ReturnsWeeklyAndPeerStats`
+- Analytics values
+    - Branch: `above_peer_avg = (user_week > peer_avg)`
+
+### `GET and DELETE /admin/logs`
+- Auth:
+    - Env var not set → always unauthorized
+        - Test: `AdminAuth.Unauthorized_NoAdminKeyEnvVar`
+    - Env var set but header missing → 401
+        - Test: `AdminLogs.Unauthorized_GetLogs`
+    - Header value without "Bearer " prefix → 401
+        - Test: `AdminAuth.Unauthorized_MissingBearerPrefix`
+    - Header with "Bearer WRONG" → 401
+        - Test: `AdminLogs.Unauthorized_DeleteLogs`
+    - Correct "Bearer super-secret" → 200
+        - All happy tests.
+- Log volume (GET)
+    - n <= 1000 logs → returns all
+    - n > 1000 → returns last 1000 only
+        - Test: `AdminLogs.Logs_ExceedLimit_ReturnsLastN` 
+- DELETE /admin/logs
+    - With logs present → clears and subsequent GET shows empty array
+        - Test: `AdminLogs.DeleteLogs_ClearsAll`
+
+### `/admin/clients` and `/admin/clients/{id}/data`
+- Auth
+    - Missing/wrong header → 401
+        - Tests: `AdminAuth...`, `AdminLogs.Unauthorized_GetLogs`, etc.
+    - Correct header → 200.
+- GET /admin/clients
+    - No active clients (no events) → empty array
+    - At least one client with events → array includes "demo"
+        - Test: `AdminClients.Clients_ListContainsDemoAfterTransit`
+- GET /admin/clients/{id}/data
+    - Path invalid (regex failure) → 404 bad_path
+    - id exists and has events → non-empty event array
+        - Tests: `AdminClients.ClientData_ReturnsUserTransitEvents_Count`, `AdminClients.ClientData_ReturnsUserTransitEvents_Content`
+    - id does not exist → empty array
+        - Test: `AdminClients.ClientData_UnknownUser_ReturnsEmptyArray`
+
+### `/admin/clear-db-events` and `/admin/clear-db`
+- Auth
+    - Wrong admin header → 401
+        - Testss: `AdminDb.Unauthorized_ClearDbEvents`, `AdminDb.Unauthorized_ClearDb`
+    - Correct header → 200 and status "ok"
+- State effects
+    - ClearDbEvents after seeding events:
+        - Before: /admin/clients non-empty
+        - After: /admin/clients empty
+        - Test: `AdminDb.ClearDbEvents_RemovesOnlyEvents_AfterwardsClientsEmpty`
+    - ClearDb after events + logs:
+        - After: /admin/clients empty and /admin/logs empty
+        - Test: `AdminDb.ClearDb_RemovesEverything_ClientsEmpty`
+
+### `/admin/emission-factors` and `/admin/emission-factors/load`
+- Auth
+    - Wrong / missing admin → 401
+    - Correct header → 200.
+- GET /admin/emission-factors
+    - Store has no persisted emission factors → returns DEFRA defaults from loader
+        - Test: `AdminEmissionFactors.GetDefaults_ReturnsBasicDefaults`
+    - Store has persisted factors → returns persisted set
+        - Test: `AdminEmissionFactors.LoadDefra2024_ReturnsCount`
+- POST /admin/emission-factors/load
+    - Correct admin header; body ignored except for content type → loads DEFRA factors and returns count
+        - Test: `AdminEmissionFactors.LoadDefra2024_ReturnsCount`
 
 ----
 *Last updated December 4, 2025*

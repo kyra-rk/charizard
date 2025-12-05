@@ -1711,6 +1711,27 @@ TEST(ApiRegister, Register_Success_LongAppName)
     EXPECT_EQ(j.value("app_name", ""), long_name);
 }
 
+// path that does NOT match /users/{id}/transit
+TEST(ApiTransit, BadPath_InvalidUserSegment)
+{
+    // (here the {id} segment is empty, so the route regex shouldn't match)
+    InMemoryStore mem;
+    mem.set_api_key("demo", "secret-demo-key");
+    TestServer const server(mem);
+    httplib::Client  cli("127.0.0.1", server.port);
+
+    json const body = { { "mode", "car" }, { "distance_km", 10.0 } };
+
+    auto res = cli.Post("/users//transit",
+                        demo_auth_headers(),
+                        body.dump(),
+                        "application/json");
+
+    ASSERT_TRUE(res != nullptr);
+    EXPECT_EQ(res->status, 404);
+}
+
+
 // Test register with special characters in app_name
 TEST(ApiRegister, Register_Success_SpecialCharsInAppName)
 {
