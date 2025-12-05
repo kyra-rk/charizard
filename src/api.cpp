@@ -190,30 +190,6 @@ void configure_routes(httplib::Server& svr,
                  record_log(store, req, res, user_id, start, static_cast<double>((end - start) * 1000));
              });
 
-    // svr.Post(R"(/users/([A-Za-z0-9_\-]+)/transit)", [&](const httplib::Request& req, httplib::Response&
-    // res) {
-    // /* regex, auth, and parameter checks */
-    // try {
-    //     if (!body.contains("mode") || !body.contains("distance_km"))
-    //     return json_response(res, {{"error","missing required fields"}}, 400);
-
-    //     TransitEvent ev(
-    //     user_id,
-    //     body["mode"].get<std::string>(),
-    //     body["distance_km"].get<double>(),
-    //     body.value("ts", static_cast<std::int64_t>(now_epoch()))
-    //     );
-
-    //     store->add_event(ev);
-    // } catch (const std::runtime_error& e) {
-    //     return json_response(res, {{"error", e.what()}}, 400);
-    // } catch (const nlohmann::json::exception&) {
-    //     return json_response(res, {{"error","invalid JSON payload"}}, 400);
-    // }
-
-    // return json_response(res, {{"status","ok"}}, 201);
-    // });
-
     // Lifetime
     svr.Get(R"(/users/([A-Za-z0-9_\-]+)/lifetime-footprint)",
             [&](const httplib::Request& req, httplib::Response& res)

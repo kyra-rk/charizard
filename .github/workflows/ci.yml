@@ -19,15 +19,15 @@ jobs:
     - name: Install dependencies
       run: |
         brew bundle
-        
-    - name: Configure and Build
+
+    - name: Configure with coverage
       run: |
-        make build
-    
+        make build-cov
+
     - name: Run all tests
       run: |
         make test
-    
+
     - name: Run style checks
       run: |
         make format-check
@@ -35,3 +35,8 @@ jobs:
     - name: Run static analysis
       run: |
         make lint
+
+    - name: Run coverage
+      run: |
+        make coverage
+

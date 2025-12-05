@@ -315,6 +315,7 @@ This project uses GitHub Actions to automatically run tests, style checks, and s
 - **All API/integration tests** — automatically run as part of `make test`
 - **Style checking** — via `make format-check` to ensure code follows the project's formatting standards
 - **Static analysis** — via `make lint` to catch potential code issues
+- **Test coverage** — via `make coverage`, which builds with coverage instrumentation and runs the test suite to generate coverage data
 
 The CI workflow is defined in `.github/workflows/ci.yml` and runs on macOS (matching our primary development environment).
 
@@ -355,5 +356,7 @@ Our CI pipeline originally ran strict readability and checkstyle rules that crea
 
 These were removed, and the CI loop now enforces formatting via clang-format and minimal style/lint checks. All style errors were fixed, and a clean CI report is included below.
 
+
+
 ----
-*Last updated November 23, 2025*
+*Last updated December 4, 2025*
