@@ -1722,15 +1722,11 @@ TEST(ApiTransit, BadPath_InvalidUserSegment)
 
     json const body = { { "mode", "car" }, { "distance_km", 10.0 } };
 
-    auto res = cli.Post("/users//transit",
-                        demo_auth_headers(),
-                        body.dump(),
-                        "application/json");
+    auto res = cli.Post("/users//transit", demo_auth_headers(), body.dump(), "application/json");
 
     ASSERT_TRUE(res != nullptr);
     EXPECT_EQ(res->status, 404);
 }
-
 
 // Test register with special characters in app_name
 TEST(ApiRegister, Register_Success_SpecialCharsInAppName)

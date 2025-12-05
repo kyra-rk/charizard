@@ -668,12 +668,6 @@ The `main` branch contains the complete, final submission for Iteration 2. All p
 
 Commit messages describe the purpose of the changes made in each pull request, providing a clear and traceable project history.
 
-The codebase for this iteration is tagged as:
-
-```
-v2.0-iteration-submission
-```
-
 ---
 
 ## 15. Change Log
