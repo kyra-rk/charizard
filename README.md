@@ -580,7 +580,10 @@ The rule set was simplified to focus on actual static-analysis checks (clang-ana
 
 Our CI pipeline originally ran strict readability and checkstyle rules that created excessive noise without improving code quality.
 
-These were removed, and the CI loop now enforces formatting via clang-format and minimal style/lint checks. All style errors were fixed, and a clean CI report is included below.
+These were removed, and the CI loop now enforces formatting via clang-format and minimal style/lint checks. All style errors were fixed, and two CI reports are attached below, showing the report before the fix and after.
+
+![Failure](assets/img/style_check_fail.png "Failure")
+![Success](assets/img/style_check_success.png "Success")
 
 ## 11. Static Analysis
 
@@ -596,7 +599,9 @@ After applying this targeted configuration:
 
 - All actionable issues were fixed in the service code.
 - Subsequent CI runs reported **no remaining static-analysis defects**.
-- Before/after CI logs documenting these improvements are included in the repository.
+- Note that this fix was performed **before** CI was implemented. As such, we have no CI report that shows the static analysis bugs.
+
+
 
 Static analysis runs automatically in GitHub Actions via:
 
